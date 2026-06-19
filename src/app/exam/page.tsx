@@ -14,7 +14,7 @@ const MODES: { mode: ExamMode; title: string; desc: string; icon: string; isPrac
   {
     mode: 'practice',
     title: 'מוד תרגול',
-    desc: 'ללא טיימר, ניתן לראות הסברים מיד — לתרגול נינוח במובייל',
+    desc: 'ללא טיימר, ניתן לראות הסברים מיד — לתרגול נינוח ובקצב שלך',
     icon: '📚',
     isPractice: true,
   },
@@ -23,12 +23,6 @@ const MODES: { mode: ExamMode; title: string; desc: string; icon: string; isPrac
     title: 'תרגול סעיף',
     desc: 'בחר סוג שאלות ספציפי לתרגול ממוקד',
     icon: '🔍',
-  },
-  {
-    mode: 'esra',
-    title: 'ESRA — אנגלית',
-    desc: 'תרגול ממוקד לחלק האנגלית בנפרד',
-    icon: '🇬🇧',
   },
 ];
 
@@ -47,10 +41,6 @@ export default function ExamModePage() {
     setLoading(true);
     setError(null);
 
-    if (mode === 'esra') {
-      router.push('/esra');
-      return;
-    }
     if (mode === 'section') {
       router.push('/practice');
       return;

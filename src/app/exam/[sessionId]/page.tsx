@@ -27,11 +27,16 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const guestId = typeof window !== 'undefined' ? (localStorage.getItem('amiret_guest_id') ?? '') : '';
+  const [guestId, setGuestId] = useState('');
+
+  // Read guestId after hydration — avoids SSR/client mismatch
+  useEffect(() => {
+    setGuestId(localStorage.getItem('amiret_guest_id') ?? '');
+  }, []);
 
   // Load or recover session state from server
   const loadSession = useCallback(async () => {
-    const res = await fetch(`/api/exam/state?sessionId=${sessionId}&guestId=${guestId}`);
+    const res = await fetch(`/api/exam/state?sessionId=${sessionId}&guestId=${encodeURIComponent(guestId)}`);
     if (!res.ok) { setError('לא ניתן לטעון את המבחן'); return; }
     const data = await res.json() as { session: SessionState; remainingMs: number; timerExpired: boolean };
 
@@ -51,9 +56,12 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     if (data.timerExpired) {
       await submitSection(data.session, Array(questionCount).fill(null));
     }
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, guestId]); // guestId must be here — loaded async after hydration
 
-  useEffect(() => { loadSession(); }, [loadSession]);
+  // Only run once guestId is resolved (avoids empty-string fetch on SSR)
+  useEffect(() => {
+    if (guestId !== undefined) loadSession();
+  }, [loadSession]);
 
   const currentSection = session?.current_section_index ?? 1;
   const currentCfg = SECTION_CONFIGS[currentSection - 1];
@@ -197,7 +205,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
             disabled={currentQuestionIndex === 0}
             className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 disabled:opacity-40 hover:bg-slate-100 transition-colors text-sm"
           >
-            ← קודם
+            קודם &rsaquo;
           </button>
 
           {/* Question nav dots */}
@@ -222,7 +230,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
               onClick={handleNext}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-medium"
             >
-              הבא →
+              &lsaquo; הבא
             </button>
           ) : (
             <button

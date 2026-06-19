@@ -26,21 +26,20 @@ const DIFFICULTY_B: Record<DifficultyLevel, number> = {
 };
 
 const TYPE_PROMPTS: Record<QuestionType, string> = {
-  sentence_completion: `Generate a Hebrew sentence completion question (השלמת משפטים) as used in the AMIRET (אמירנ"ט) exam by MALU.
-The sentence should have a blank (____) that the student must complete from 4 options.
-The sentence should test vocabulary, logic, and Hebrew language proficiency.`,
+  sentence_completion: `Generate an English sentence completion question as used in the AMIRET exam by MALU.
+The sentence must have a blank (____) completed by choosing 1 of 4 options.
+Test academic English vocabulary, grammar, and logic. ALL text must be in English.`,
 
-  restatement: `Generate a Hebrew restatement question (ניסוח מחדש) as used in the AMIRET exam.
-Provide a Hebrew sentence and ask the student to identify which of 4 options expresses the same meaning.
-Test comprehension of complex Hebrew phrasing.`,
+  restatement: `Generate an English restatement question as used in the AMIRET exam by MALU.
+Provide one English sentence, then 4 options — the student identifies which option expresses the same meaning.
+Test comprehension of complex English phrasing. ALL text must be in English.`,
 
-  reading_comprehension: `Generate a Hebrew reading comprehension question (שאלת הבנת הנקרא) for the AMIRET exam.
-The question should be based on a provided passage (do NOT include the passage in the question text — it will be linked separately).
-Test the student's ability to identify main ideas, inferences, and vocabulary in context.`,
+  reading_comprehension: `Generate an English reading comprehension question for the AMIRET exam.
+The question is based on a provided passage (do NOT include the passage in the question text — it will be linked separately).
+Test the student's ability to identify main ideas, inferences, and vocabulary in context. ALL text must be in English.`,
 
-  esra: `Generate an English reading comprehension / vocabulary question (ESRA style) as used in the AMIRET exam.
-Questions should test English reading comprehension, vocabulary in context, or sentence completion.
-All text should be in English.`,
+  esra: `Generate an English reading comprehension or vocabulary question for the AMIRET exam.
+Test English reading comprehension, vocabulary in context, or sentence completion. ALL text must be in English.`,
 };
 
 /**
@@ -122,11 +121,11 @@ export async function generatePassage(difficulty: DifficultyLevel): Promise<{ te
   const b = DIFFICULTY_B[difficulty];
   const lengthGuide = difficulty <= 2 ? '150-200' : difficulty <= 3 ? '200-280' : '280-380';
 
-  const prompt = `Write a Hebrew reading comprehension passage (קטע הבנת הנקרא) for the AMIRET exam.
+  const prompt = `Write an English reading comprehension passage for the AMIRET exam (the Israeli university English placement test).
 Difficulty: ${difficulty}/5. Length: ${lengthGuide} words.
-The passage should be on a topic relevant to Israeli academic life (science, society, history, culture).
-It should be factual, well-structured, and not mention any real specific people or contain copyrighted content.
-Return ONLY the passage text in Hebrew, no markdown, no title.`;
+The passage should be on an academic topic (science, society, history, technology, environment, or culture).
+It must be factual, well-structured, original, and not reference any copyrighted material.
+Return ONLY the passage text in English, no markdown, no title.`;
 
   const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
