@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminSupabaseClient } from '@/lib/supabase-server';
+import { generateQuestions, generatePassage } from '@/lib/ai';
+import type { QuestionType, DifficultyLevel } from '@/types/exam';
+
+/**
+ * POST /api/questions/generate
+ * Admin-only: bulk generates questions via GPT-4o and seeds Supabase.
+ * NOT called during live exams.
+ */
+export async function POST(req: NextRequest) {
+  const supabase = await createAdminSupabaseClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Simple admin check via email (can be replaced with a roles table)
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim());
+  if (!adminEmails.includes(user.email ?? '')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const body = await req.json() as {
+    type: QuestionType;
+    difficulty: DifficultyLevel;
+    count?: number;
+    generatePassage?: boolean;
+  };
+
+  const { type, difficulty, count = 5 } = body;
+
+  if (type === 'reading_comprehension' && body.generatePassage) {
+    // First generate passage, then questions for it
+    const passage = await generatePassage(difficulty);
+
+    const { data: passageRow, error: passErr } = await supabase
+      .from('passages')
+      .insert({ text: passage.text, difficulty_level: difficulty, b: passage.b })
+      .select()
+      .single();
+
+    if (passErr || !passageRow) {
+      return NextResponse.json({ error: 'Failed to insert passage' }, { status: 500 });
+    }
+
+    const questions = await generateQuestions(type, difficulty, 5, passage.text);
+
+    const rows = questions.map(q => ({
+      type,
+      text: q.text,
+      passage_id: passageRow.id,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      explanation: q.explanation,
+      a: q.a,
+      b: q.b,
+      c: q.c,
+      difficulty_level: q.difficulty_level,
+      created_by: 'ai',
+    }));
+
+    const { data: inserted, error: qErr } = await supabase
+      .from('questions')
+      .insert(rows)
+      .select('id');
+
+    if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
+    return NextResponse.json({ passageId: passageRow.id, inserted: inserted?.length });
+  }
+
+  // Non-reading-comprehension or reading without new passage
+  const questions = await generateQuestions(type, difficulty, count);
+
+  const rows = questions.map(q => ({
+    type,
+    text: q.text,
+    options: q.options,
+    correct_answer: q.correct_answer,
+    explanation: q.explanation,
+    a: q.a,
+    b: q.b,
+    c: q.c,
+    difficulty_level: q.difficulty_level,
+    created_by: 'ai',
+  }));
+
+  const { data: inserted, error: qErr } = await supabase
+    .from('questions')
+    .insert(rows)
+    .select('id');
+
+  if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
+  return NextResponse.json({ inserted: inserted?.length });
+}

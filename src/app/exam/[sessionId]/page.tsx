@@ -1,0 +1,237 @@
+'use client';
+
+import { useEffect, useState, useCallback, use } from 'react';
+import { useRouter } from 'next/navigation';
+import { ExamTimer } from '@/components/exam/ExamTimer';
+import { QuestionCard } from '@/components/exam/QuestionCard';
+import { SectionProgress } from '@/components/exam/SectionProgress';
+import { SECTION_CONFIGS, type Question } from '@/types/exam';
+
+interface SessionState {
+  id: string;
+  current_section_index: number;
+  current_section_expires_at: string | null;
+  theta: number;
+  questions_by_section: Record<number, Question[]>;
+  answers_by_section: Record<number, (number | null)[]>;
+  is_practice: boolean;
+  completed_at: string | null;
+}
+
+export default function ExamPage({ params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = use(params);
+  const router = useRouter();
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load or recover session state from server
+  const loadSession = useCallback(async () => {
+    const res = await fetch(`/api/exam/state?sessionId=${sessionId}`);
+    if (!res.ok) { setError('לא ניתן לטעון את המבחן'); return; }
+    const data = await res.json() as { session: SessionState; remainingMs: number; timerExpired: boolean };
+
+    if (data.session.completed_at) {
+      router.replace(`/results/${sessionId}`);
+      return;
+    }
+
+    const section = data.session.current_section_index;
+    const existingAnswers = (data.session.answers_by_section as Record<number, (number | null)[]>)[section];
+    const questionCount = (data.session.questions_by_section as Record<number, Question[]>)[section]?.length ?? 0;
+
+    setSession(data.session);
+    setAnswers(existingAnswers ?? Array(questionCount).fill(null));
+
+    // If timer already expired on server, submit immediately
+    if (data.timerExpired) {
+      await submitSection(data.session, Array(questionCount).fill(null));
+    }
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadSession(); }, [loadSession]);
+
+  const currentSection = session?.current_section_index ?? 1;
+  const currentCfg = SECTION_CONFIGS[currentSection - 1];
+  const currentQuestions = (session?.questions_by_section[currentSection] ?? []) as Question[];
+  const completedSections = session
+    ? Object.keys(session.answers_by_section).map(Number).filter(n => n < currentSection)
+    : [];
+
+  const handleAnswer = (questionIndex: number, optionIndex: number) => {
+    setAnswers(prev => {
+      const next = [...prev];
+      next[questionIndex] = optionIndex;
+      return next;
+    });
+  };
+
+  const submitSection = useCallback(async (sess: SessionState, sectionAnswers: (number | null)[]) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch('/api/exam/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sess.id,
+          sectionIndex: sess.current_section_index,
+          answers: sectionAnswers,
+        }),
+      });
+
+      const data = await res.json() as { isComplete: boolean; nextSectionIndex: number; nextExpiresAt: string };
+
+      if (data.isComplete) {
+        router.push(`/results/${sess.id}`);
+      } else {
+        // Refresh session state
+        await loadSession();
+        setCurrentQuestionIndex(0);
+      }
+    } catch {
+      setError('שגיאה בשליחת התשובות. נסה שוב.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, loadSession, router]);
+
+  const handleTimerExpire = useCallback(() => {
+    if (!session) return;
+    submitSection(session, answers);
+  }, [session, answers, submitSection]);
+
+  const handleNext = () => {
+    if (currentQuestionIndex < currentQuestions.length - 1) {
+      setCurrentQuestionIndex(i => i + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentQuestionIndex > 0) setCurrentQuestionIndex(i => i - 1);
+  };
+
+  const handleSubmitSection = () => {
+    if (!session) return;
+    const unanswered = answers.filter(a => a === null).length;
+    if (unanswered > 0 && !session.is_practice) {
+      const confirm = window.confirm(
+        `השארת ${unanswered} שאלות ללא מענה. תשובה ריקה נחשבת שגויה.\nלהמשיך?`
+      );
+      if (!confirm) return;
+    }
+    submitSection(session, answers);
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50" dir="rtl">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-4">{error}</div>
+          <button onClick={loadSession} className="text-blue-600 underline">נסה שוב</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || currentQuestions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-400 text-lg">טוען מבחן...</div>
+      </div>
+    );
+  }
+
+  const question = currentQuestions[currentQuestionIndex];
+
+  return (
+    <div className="min-h-screen bg-slate-50" dir="rtl">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-900">מבחן אמירנ"ט</span>
+              <span className="text-xs text-slate-500">
+                פרק {currentSection} — {currentCfg?.type === 'sentence_completion' ? 'השלמת משפטים' :
+                  currentCfg?.type === 'restatement' ? 'ניסוח מחדש' :
+                  currentCfg?.type === 'reading_comprehension' ? 'הבנת הנקרא' : 'ESRA'}
+              </span>
+            </div>
+            <ExamTimer
+              expiresAt={session.current_section_expires_at}
+              isPractice={session.is_practice}
+              onExpire={handleTimerExpire}
+            />
+          </div>
+          <div className="mt-3">
+            <SectionProgress
+              currentSection={currentSection}
+              completedSections={completedSections}
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Main exam area */}
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <QuestionCard
+          question={question}
+          questionNumber={currentQuestionIndex + 1}
+          totalInSection={currentQuestions.length}
+          selectedAnswer={answers[currentQuestionIndex] ?? null}
+          onSelect={(idx) => handleAnswer(currentQuestionIndex, idx)}
+          isPractice={session.is_practice}
+        />
+
+        {/* Navigation */}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <button
+            onClick={handlePrev}
+            disabled={currentQuestionIndex === 0}
+            className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 disabled:opacity-40 hover:bg-slate-100 transition-colors text-sm"
+          >
+            ← קודם
+          </button>
+
+          {/* Question nav dots */}
+          <div className="flex gap-2">
+            {currentQuestions.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentQuestionIndex(i)}
+                className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${
+                  i === currentQuestionIndex ? 'bg-blue-600 text-white scale-110' :
+                  answers[i] !== null ? 'bg-blue-100 text-blue-700' :
+                  'bg-slate-200 text-slate-500 hover:bg-slate-300'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          {currentQuestionIndex < currentQuestions.length - 1 ? (
+            <button
+              onClick={handleNext}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              הבא →
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmitSection}
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors text-sm font-bold disabled:opacity-60"
+            >
+              {isSubmitting ? 'שולח...' : currentSection < SECTION_CONFIGS.length ? 'סיים פרק →' : 'סיים מבחן ✓'}
+            </button>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
