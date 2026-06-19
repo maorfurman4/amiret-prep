@@ -1,7 +1,10 @@
 import OpenAI from 'openai';
 import type { QuestionType, DifficultyLevel } from '@/types/exam';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy init — prevents build failure when OPENAI_API_KEY is not set
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? 'placeholder' });
+}
 
 interface GeneratedQuestion {
   text: string;
@@ -83,7 +86,7 @@ IMPORTANT:
 - Distractors must be plausible
 - Return ONLY valid JSON, no markdown`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [
       { role: 'system', content: 'You are an expert in Israeli academic entrance exams, specifically the AMIRET (אמירנ"ט) exam by MALU. You generate high-quality practice questions.' },
@@ -125,7 +128,7 @@ The passage should be on a topic relevant to Israeli academic life (science, soc
 It should be factual, well-structured, and not mention any real specific people or contain copyrighted content.
 Return ONLY the passage text in Hebrew, no markdown, no title.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
@@ -166,7 +169,7 @@ ${mistakeList}
 
 כתוב בעברית, בצורה ברורה ומעודדת. אל תחזור על טקסט השאלה המלא.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.5,
