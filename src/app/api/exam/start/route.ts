@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type ExamMode, type Question } from '@/types/exam';
 import { routeNextDifficulty } from '@/lib/adaptive';
 
@@ -9,7 +9,7 @@ import { routeNextDifficulty } from '@/lib/adaptive';
  * writes the first section timer to Supabase (server-driven).
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   // Auth is optional — guests use a client-generated guest_id
   const { data: { user } } = await supabase.auth.getUser();

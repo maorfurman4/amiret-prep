@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/supabase-server';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type Question, type SectionResult } from '@/types/exam';
 import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCount } from '@/lib/adaptive';
 
@@ -9,7 +9,7 @@ import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCoun
  * Updates θ via IRT, routes next section questions, advances server timer.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createAdminSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data: { user } } = await supabase.auth.getUser();
 
