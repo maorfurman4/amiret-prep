@@ -12,7 +12,7 @@ interface QuestionCardProps {
   showResult?: boolean; // practice mode only
 }
 
-const OPTION_LABELS = ['א', 'ב', 'ג', 'ד'];
+const OPTION_LABELS = ['1', '2', '3', '4'];
 
 export function QuestionCard({
   question,
@@ -24,7 +24,7 @@ export function QuestionCard({
   showResult = false,
 }: QuestionCardProps) {
   return (
-    <div className="w-full max-w-2xl mx-auto" dir="rtl">
+    <div className="w-full max-w-2xl mx-auto" dir="ltr">
       {/* Question header */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-slate-500 font-medium">
@@ -47,7 +47,7 @@ export function QuestionCard({
       {/* Passage for reading comprehension */}
       {question.passage && (
         <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed text-slate-700 font-medium">
-          <div className="text-xs text-slate-400 mb-2 font-normal">קטע קריאה</div>
+          <div className="text-xs text-slate-400 mb-2 font-normal">Reading Passage</div>
           {question.passage.text}
         </div>
       )}
@@ -70,7 +70,7 @@ export function QuestionCard({
               key={option.id}
               onClick={() => onSelect(i)}
               disabled={showResult}
-              className={`w-full text-right px-4 py-3 rounded-xl border-2 transition-all flex items-center gap-3 ${
+              className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center gap-3 ${
                 showCorrect  ? 'border-green-500 bg-green-50 text-green-800' :
                 isWrong      ? 'border-red-500 bg-red-50 text-red-800' :
                 isSelected   ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium' :
