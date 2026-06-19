@@ -5,13 +5,12 @@ import { routeNextDifficulty } from '@/lib/adaptive';
 
 /**
  * POST /api/exam/start
- * Creates a new exam session, pre-loads all questions from DB,
- * writes the first section timer to Supabase (server-driven).
+ * True Multistage CAT: initializes ONLY Section 1 at difficulty=3 (θ=0 start).
+ * Every subsequent section is fetched in /api/exam/answer after θ is updated.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
 
-  // Auth is optional — guests use a client-generated guest_id
   const { data: { user } } = await supabase.auth.getUser();
   const body = await req.json() as { mode?: ExamMode; isPractice?: boolean; guestId?: string };
   const sessionOwner = user?.id ?? body.guestId ?? crypto.randomUUID();
@@ -19,55 +18,32 @@ export async function POST(req: NextRequest) {
   const mode: ExamMode = body.mode ?? 'full';
   const isPractice = body.isPractice ?? false;
 
-  // For 'full' mode: pre-fetch all 6 sections at difficulty=3 (θ=0 start).
-  // Routing adjusts after each section in /api/exam/answer.
-  const questionsBySection: Record<number, Question[]> = {};
-
-  const configs = SECTION_CONFIGS;
+  // Initial θ=0 → difficulty level 3
   const initialDifficulty = routeNextDifficulty(0); // = 3
+  const section1Cfg = SECTION_CONFIGS[0]; // { index:1, type:'sentence_completion', questionCount:4 }
 
-  for (const cfg of configs) {
-    if (cfg.type === 'reading_comprehension') {
-      // Fetch a passage + its 5 questions together
-      const { data: passages } = await supabase
-        .from('passages')
-        .select('id, text, difficulty_level, b')
-        .eq('difficulty_level', initialDifficulty)
-        .limit(20);
+  // Fetch ONLY Section 1 questions
+  const { data: qs, error: qErr } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('type', section1Cfg.type)
+    .eq('difficulty_level', initialDifficulty)
+    .limit(section1Cfg.questionCount + 10);
 
-      const passage = passages?.[Math.floor(Math.random() * (passages?.length ?? 1))];
-      if (!passage) {
-        questionsBySection[cfg.index] = [];
-        continue;
-      }
-
-      const { data: qs } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('type', 'reading_comprehension')
-        .eq('passage_id', passage.id)
-        .limit(5);
-
-      questionsBySection[cfg.index] = (qs ?? []).map(q => ({
-        ...q,
-        passage: { id: passage.id, text: passage.text, difficulty_level: passage.difficulty_level, b: passage.b },
-      })) as Question[];
-    } else {
-      const { data: qs } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('type', cfg.type)
-        .eq('difficulty_level', initialDifficulty)
-        .limit(cfg.questionCount + 10); // fetch more, pick randomly
-
-      const shuffled = (qs ?? []).sort(() => Math.random() - 0.5).slice(0, cfg.questionCount);
-      questionsBySection[cfg.index] = shuffled as Question[];
-    }
+  if (qErr || !qs) {
+    return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
   }
 
-  // Create session with server timer for section 1
-  const firstSection = configs[0];
-  const expiresAt = new Date(Date.now() + firstSection.durationSeconds * 1000).toISOString();
+  const section1Questions = (qs as Question[])
+    .sort(() => Math.random() - 0.5)
+    .slice(0, section1Cfg.questionCount);
+
+  const questionsBySection: Record<number, Question[]> = {
+    1: section1Questions,
+  };
+
+  // Server timer for Section 1
+  const expiresAt = new Date(Date.now() + section1Cfg.durationSeconds * 1000).toISOString();
 
   const { data: session, error: insertError } = await supabase
     .from('exam_sessions')

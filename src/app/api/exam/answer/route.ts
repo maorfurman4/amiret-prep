@@ -5,8 +5,11 @@ import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCoun
 
 /**
  * POST /api/exam/answer
- * Called when the user submits answers for a section (manual or timer-expired).
- * Updates θ via IRT, routes next section questions, advances server timer.
+ * True Multistage CAT:
+ *  1. Updates θ via MLE/EAP based on the completed section.
+ *  2. Derives the difficulty level for the NEXT section from the new θ.
+ *  3. Fetches ONLY the next section's questions from DB at that difficulty.
+ * No section is ever pre-fetched — every section is determined adaptively.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -22,7 +25,6 @@ export async function POST(req: NextRequest) {
 
   const sessionOwner = user?.id ?? body.guestId;
 
-  // Fetch current session — match by sessionId (and owner if provided)
   const query = supabase.from('exam_sessions').select('*').eq('id', body.sessionId);
   if (sessionOwner) query.eq('user_id', sessionOwner);
   const { data: session, error: fetchErr } = await query.single();
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
   const currentQuestions = questionsBySection[body.sectionIndex] ?? [];
   const cfg = SECTION_CONFIGS[body.sectionIndex - 1];
 
-  // Compute new theta
+  // ── Step 1: Update θ via MLE/EAP ────────────────────────────────────────────
   const sectionForAdaptive = { questions: currentQuestions, answers: body.answers };
   const newTheta = updateThetaAfterSection(session.theta, sectionForAdaptive);
 
@@ -54,7 +56,11 @@ export async function POST(req: NextRequest) {
     totalCount: currentQuestions.length,
   };
 
-  const newHistory = [...(session.theta_history as object[]), { after_section: body.sectionIndex, theta: newTheta }];
+  const newHistory = [
+    ...(session.theta_history as object[]),
+    { after_section: body.sectionIndex, theta: newTheta },
+  ];
+
   const nextSectionIndex = body.sectionIndex + 1;
   const isLastSection = nextSectionIndex > SECTION_CONFIGS.length;
 
@@ -67,18 +73,19 @@ export async function POST(req: NextRequest) {
   };
 
   if (isLastSection) {
-    // Exam complete
+    // Exam complete — no more sections to fetch
     updatePayload.completed_at = new Date().toISOString();
     updatePayload.theta_final = newTheta;
     updatePayload.score = thetaToScore(newTheta);
     updatePayload.current_section_expires_at = null;
   } else {
-    // Pre-fetch next section questions at new difficulty
+    // ── Step 2: Derive next difficulty from updated θ ──────────────────────────
     const nextDifficulty = routeNextDifficulty(newTheta);
     const nextCfg = SECTION_CONFIGS[nextSectionIndex - 1];
-    let nextQuestions: Question[] = questionsBySection[nextSectionIndex] ?? [];
 
-    // Fetch fresh set from DB at correct difficulty level (adaptive routing)
+    // ── Step 3: Fetch ONLY next section from DB at the adaptive difficulty ─────
+    let nextQuestions: Question[] = [];
+
     if (nextCfg.type === 'reading_comprehension') {
       const { data: passages } = await supabase
         .from('passages')
@@ -108,16 +115,22 @@ export async function POST(req: NextRequest) {
         .eq('difficulty_level', nextDifficulty)
         .limit(nextCfg.questionCount + 10);
 
-      nextQuestions = (qs ?? []).sort(() => Math.random() - 0.5).slice(0, nextCfg.questionCount) as Question[];
+      nextQuestions = (qs ?? [])
+        .sort(() => Math.random() - 0.5)
+        .slice(0, nextCfg.questionCount) as Question[];
     }
 
-    const updatedQuestions = { ...questionsBySection, [nextSectionIndex]: nextQuestions };
-    updatePayload.questions_by_section = updatedQuestions;
+    // Write only the newly fetched section; keep completed sections for results page
+    updatePayload.questions_by_section = {
+      ...questionsBySection,
+      [nextSectionIndex]: nextQuestions,
+    };
 
     // Server timer for next section
     if (!session.is_practice) {
-      const expiresAt = new Date(Date.now() + nextCfg.durationSeconds * 1000).toISOString();
-      updatePayload.current_section_expires_at = expiresAt;
+      updatePayload.current_section_expires_at = new Date(
+        Date.now() + nextCfg.durationSeconds * 1000,
+      ).toISOString();
     }
   }
 
