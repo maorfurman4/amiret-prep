@@ -11,17 +11,14 @@ export async function GET(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const sessionId = req.nextUrl.searchParams.get('sessionId');
+  const guestId = req.nextUrl.searchParams.get('guestId');
   if (!sessionId) return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
 
-  const { data: session } = await supabase
-    .from('exam_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .eq('user_id', user.id)
-    .single();
+  const sessionOwner = user?.id ?? guestId;
+  const query = supabase.from('exam_sessions').select('*').eq('id', sessionId);
+  if (sessionOwner) query.eq('user_id', sessionOwner);
+  const { data: session } = await query.single();
 
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

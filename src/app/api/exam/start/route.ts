@@ -11,13 +11,11 @@ import { routeNextDifficulty } from '@/lib/adaptive';
 export async function POST(req: NextRequest) {
   const supabase = await createAdminSupabaseClient();
 
-  // Auth check
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Auth is optional — guests use a client-generated guest_id
+  const { data: { user } } = await supabase.auth.getUser();
+  const body = await req.json() as { mode?: ExamMode; isPractice?: boolean; guestId?: string };
+  const sessionOwner = user?.id ?? body.guestId ?? crypto.randomUUID();
 
-  const body = await req.json() as { mode?: ExamMode; isPractice?: boolean };
   const mode: ExamMode = body.mode ?? 'full';
   const isPractice = body.isPractice ?? false;
 
@@ -74,7 +72,7 @@ export async function POST(req: NextRequest) {
   const { data: session, error: insertError } = await supabase
     .from('exam_sessions')
     .insert({
-      user_id: user.id,
+      user_id: sessionOwner,
       mode,
       is_practice: isPractice,
       current_section_index: 1,

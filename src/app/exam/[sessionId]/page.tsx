@@ -27,9 +27,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const guestId = typeof window !== 'undefined' ? (localStorage.getItem('amiret_guest_id') ?? '') : '';
+
   // Load or recover session state from server
   const loadSession = useCallback(async () => {
-    const res = await fetch(`/api/exam/state?sessionId=${sessionId}`);
+    const res = await fetch(`/api/exam/state?sessionId=${sessionId}&guestId=${guestId}`);
     if (!res.ok) { setError('לא ניתן לטעון את המבחן'); return; }
     const data = await res.json() as { session: SessionState; remainingMs: number; timerExpired: boolean };
 
@@ -80,6 +82,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
           sessionId: sess.id,
           sectionIndex: sess.current_section_index,
           answers: sectionAnswers,
+          guestId,
         }),
       });
 

@@ -11,24 +11,21 @@ import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCoun
 export async function POST(req: NextRequest) {
   const supabase = await createAdminSupabaseClient();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { data: { user } } = await supabase.auth.getUser();
 
   const body = await req.json() as {
     sessionId: string;
     sectionIndex: number;
-    answers: (number | null)[]; // answers for completed section
+    answers: (number | null)[];
+    guestId?: string;
   };
 
-  // Fetch current session
-  const { data: session, error: fetchErr } = await supabase
-    .from('exam_sessions')
-    .select('*')
-    .eq('id', body.sessionId)
-    .eq('user_id', user.id)
-    .single();
+  const sessionOwner = user?.id ?? body.guestId;
+
+  // Fetch current session — match by sessionId (and owner if provided)
+  const query = supabase.from('exam_sessions').select('*').eq('id', body.sessionId);
+  if (sessionOwner) query.eq('user_id', sessionOwner);
+  const { data: session, error: fetchErr } = await query.single();
 
   if (fetchErr || !session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });

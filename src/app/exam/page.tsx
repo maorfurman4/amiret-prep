@@ -37,6 +37,12 @@ export default function ExamModePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getOrCreateGuestId = () => {
+    let id = localStorage.getItem('amiret_guest_id');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('amiret_guest_id', id); }
+    return id;
+  };
+
   const startExam = async (mode: ExamMode, isPractice = false) => {
     setLoading(true);
     setError(null);
@@ -51,10 +57,11 @@ export default function ExamModePage() {
     }
 
     try {
+      const guestId = getOrCreateGuestId();
       const res = await fetch('/api/exam/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, isPractice }),
+        body: JSON.stringify({ mode, isPractice, guestId }),
       });
 
       if (!res.ok) {
