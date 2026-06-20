@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QuestionCard } from '@/components/exam/QuestionCard';
 import type { Question, QuestionType } from '@/types/exam';
+import { BackNav } from '@/components/BackNav';
 
 type Step = 'pick-type' | 'pick-difficulty' | 'pick-count' | 'practicing' | 'done';
 type Difficulty = 1 | 2 | 3 | 4 | 5 | 'random';
@@ -100,11 +101,10 @@ export default function PracticePage() {
 
   if (step === 'pick-type') {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12" dir="rtl">
+      <div className="min-h-screen bg-slate-50 flex flex-col" dir="rtl">
+        <BackNav backHref="/exam" backLabel="מבחן" />
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
-          <button onClick={() => router.push('/exam')} className="text-slate-400 text-sm mb-6 hover:text-slate-600">
-            ← חזרה לתפריט
-          </button>
           <h1 className="text-2xl font-bold text-slate-900 mb-1">תרגול סעיף</h1>
           <p className="text-slate-500 mb-8 text-sm">בחר את סוג השאלות שתרצה לתרגל</p>
           <div className="space-y-3">
@@ -122,6 +122,7 @@ export default function PracticePage() {
               </button>
             ))}
           </div>
+        </div>
         </div>
       </div>
     );

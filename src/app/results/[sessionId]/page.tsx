@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import { BackNav } from '@/components/BackNav';
 import { classifyScore, SECTION_CONFIGS, type SectionResult, type Question } from '@/types/exam';
 import { thetaToScore } from '@/lib/adaptive';
 
@@ -81,8 +82,9 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4" dir="rtl">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50" dir="rtl">
+      <BackNav backHref="/exam" backLabel="מבחן" />
+      <div className="max-w-2xl mx-auto space-y-8 py-8 px-4">
         {/* Score card */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-center">
           <div className="text-6xl font-black text-slate-900 mb-2">{score}</div>

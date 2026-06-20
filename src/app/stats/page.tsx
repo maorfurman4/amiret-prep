@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { classifyScore } from '@/types/exam';
+import { BackNav } from '@/components/BackNav';
 
 interface Stats {
   total_exams: number;
@@ -40,18 +41,26 @@ export default function StatsPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">טוען...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50" dir="rtl">
+        <BackNav backHref="/exam" backLabel="מבחן" />
+        <div className="flex items-center justify-center h-[calc(100vh-3rem)] text-slate-400">טוען...</div>
+      </div>
+    );
   }
 
   if (!stats || stats.total_exams === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center px-4" dir="rtl">
-        <div className="text-5xl mb-4">📊</div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">אין עדיין נתונים</h1>
-        <p className="text-slate-500 mb-6">סיים לפחות מבחן אחד כדי לראות סטטיסטיקות</p>
-        <a href="/exam" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-          התחל מבחן
-        </a>
+      <div className="min-h-screen bg-slate-50" dir="rtl">
+        <BackNav backHref="/exam" backLabel="מבחן" />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-3rem)] text-center px-4">
+          <div className="text-5xl mb-4">📊</div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">אין עדיין נתונים</h1>
+          <p className="text-slate-500 mb-6">סיים לפחות מבחן אחד כדי לראות סטטיסטיקות</p>
+          <a href="/exam" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+            התחל מבחן
+          </a>
+        </div>
       </div>
     );
   }
@@ -59,8 +68,9 @@ export default function StatsPage() {
   const classification = stats.best_score ? classifyScore(stats.best_score) : null;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4" dir="rtl">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50" dir="rtl">
+      <BackNav backHref="/exam" backLabel="מבחן" />
+      <div className="max-w-2xl mx-auto space-y-6 py-8 px-4">
         <h1 className="text-2xl font-black text-slate-900">הסטטיסטיקה שלי</h1>
 
         {/* Summary cards */}
@@ -143,3 +153,4 @@ export default function StatsPage() {
     </div>
   );
 }
+

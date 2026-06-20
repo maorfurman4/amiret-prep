@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ExamMode } from '@/types/exam';
+import { BackNav } from '@/components/BackNav';
 
 const MODES: { mode: ExamMode; title: string; desc: string; icon: string; isPractice?: boolean }[] = [
   {
@@ -69,7 +70,9 @@ export default function ExamModePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12" dir="rtl">
+    <div className="min-h-screen bg-slate-50 flex flex-col" dir="rtl">
+      <BackNav backHref="/" backLabel="דף הבית" />
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">בחר מצב</h1>
@@ -96,6 +99,7 @@ export default function ExamModePage() {
             </button>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
