@@ -72,15 +72,10 @@ export function QuestionCard({
         </div>
       )}
 
-      {/* Restatement banner — highlights original sentence */}
+      {/* Restatement — show sentence plainly */}
       {question.type === 'restatement' && (
-        <div className="mb-4 px-4 py-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl">
-          <div className="text-xs text-amber-700 font-bold mb-2 uppercase tracking-wide">
-            📌 המשפט המקורי — מצא את הניסוח השקול:
-          </div>
-          <div className="text-base font-semibold text-amber-900 leading-relaxed" dir="ltr">
-            {question.text}
-          </div>
+        <div className="mb-6 text-lg font-semibold text-slate-900 leading-relaxed" dir="ltr">
+          {question.text}
         </div>
       )}
 
