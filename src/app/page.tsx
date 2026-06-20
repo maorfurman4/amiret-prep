@@ -8,28 +8,17 @@ export default function HomePage() {
           <div className="text-5xl mb-4">🎓</div>
           <h1 className="text-4xl font-black mb-3">הכנה לאמירנ&quot;ט</h1>
           <p className="text-slate-300 text-lg">
-            פלטפורמת ההכנה המדויקת ביותר — אלגוריתם IRT אדפטיבי, טיימר שרת, שאלות AI
+            פלטפורמת ההכנה המדוייקת ביותר שמכינה אותכם לציון הטוב ביותר
           </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 justify-center">
-          {['🧠 אלגוריתם IRT 3PL', '⏱ טיימר שרת', '🔀 אדפטיבי', '📊 סטטיסטיקה', '🏆 לוח ישיבות'].map(f => (
-            <span key={f} className="px-3 py-1 bg-white/10 rounded-full text-sm font-medium">{f}</span>
-          ))}
         </div>
 
         <div className="space-y-3">
           <Link href="/exam" className="block w-full py-4 bg-blue-500 hover:bg-blue-400 rounded-2xl text-xl font-bold transition-colors">
             התחל מבחן
           </Link>
-          <div className="flex gap-3">
-            <Link href="/stats" className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors">
-              הסטטיסטיקה שלי
-            </Link>
-            <Link href="/leaderboard" className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors">
-              לוח ישיבות
-            </Link>
-          </div>
+          <Link href="/stats" className="block w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors">
+            הסטטיסטיקה שלי
+          </Link>
         </div>
 
         <div className="bg-white/5 rounded-2xl p-5 text-right">
