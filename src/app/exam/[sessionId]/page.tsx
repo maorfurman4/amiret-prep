@@ -6,7 +6,6 @@ import { ExamTimer } from '@/components/exam/ExamTimer';
 import { QuestionCard } from '@/components/exam/QuestionCard';
 import { SectionProgress } from '@/components/exam/SectionProgress';
 import { SECTION_CONFIGS, type Question } from '@/types/exam';
-import type { ExplanationData } from '@/app/api/practice/explain/route';
 
 interface SessionState {
   id: string;
@@ -28,10 +27,8 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Practice mode: track which question indices have been answered + their explanations
+  // Practice mode: track which question indices have been answered (locked)
   const [lockedAnswers, setLockedAnswers] = useState<Set<number>>(new Set());
-  const [explanationCache, setExplanationCache] = useState<Record<number, ExplanationData>>({});
-  const [loadingExplanation, setLoadingExplanation] = useState(false);
 
   const [guestId, setGuestId] = useState('');
 
@@ -76,34 +73,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     ? Object.keys(session.answers_by_section).map(Number).filter(n => n < currentSection)
     : [];
 
-  const fetchExplanation = useCallback(async (question: Question, questionIndex: number, optionIndex: number) => {
-    if (explanationCache[questionIndex]) return;
-    setLoadingExplanation(true);
-    try {
-      const res = await fetch('/api/practice/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: question.id,
-          questionText: question.text,
-          options: question.options,
-          correctAnswer: question.correct_answer,
-          questionType: question.type,
-          passageText: question.passage?.text,
-          selectedAnswer: optionIndex,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json() as ExplanationData;
-        setExplanationCache(prev => ({ ...prev, [questionIndex]: data }));
-      }
-    } catch {
-      // Non-critical
-    } finally {
-      setLoadingExplanation(false);
-    }
-  }, [explanationCache]);
-
   const handleAnswer = (questionIndex: number, optionIndex: number) => {
     setAnswers(prev => {
       const next = [...prev];
@@ -112,7 +81,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     });
     if (session?.is_practice) {
       setLockedAnswers(prev => new Set([...prev, questionIndex]));
-      fetchExplanation(currentQuestions[questionIndex], questionIndex, optionIndex);
     }
   };
 
@@ -141,7 +109,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
         await loadSession();
         setCurrentQuestionIndex(0);
         setLockedAnswers(new Set());
-        setExplanationCache({});
       }
     } catch {
       setError('שגיאה בשליחת התשובות. נסה שוב.');
@@ -237,8 +204,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
           onSelect={(idx) => handleAnswer(currentQuestionIndex, idx)}
           isPractice={session.is_practice}
           showResult={session.is_practice && lockedAnswers.has(currentQuestionIndex)}
-          explanationData={explanationCache[currentQuestionIndex] ?? null}
-          loadingExplanation={loadingExplanation && lockedAnswers.has(currentQuestionIndex) && !explanationCache[currentQuestionIndex]}
         />
 
         {/* Navigation */}

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { QuestionCard } from '@/components/exam/QuestionCard';
 import type { Question, QuestionType } from '@/types/exam';
-import type { ExplanationData } from '@/app/api/practice/explain/route';
 
 type Step = 'pick-type' | 'pick-difficulty' | 'pick-count' | 'practicing' | 'done';
 type Difficulty = 1 | 2 | 3 | 4 | 5 | 'random';
@@ -38,8 +37,6 @@ export default function PracticePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers]         = useState<(number | null)[]>([]);
   const [showResult, setShowResult]   = useState(false);
-  const [explanationData, setExplanationData] = useState<ExplanationData | null>(null);
-  const [loadingExplanation, setLoadingExplanation] = useState(false);
 
   const fetchQuestions = async (overrideDiff?: Difficulty) => {
     setLoading(true);
@@ -70,47 +67,18 @@ export default function PracticePage() {
     }
   };
 
-  const fetchExplanation = async (question: Question, optionIndex: number) => {
-    setLoadingExplanation(true);
-    setExplanationData(null);
-    try {
-      const res = await fetch('/api/practice/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: question.id,
-          questionText: question.text,
-          options: question.options,
-          correctAnswer: question.correct_answer,
-          questionType: question.type,
-          passageText: question.passage?.text,
-          selectedAnswer: optionIndex,
-        }),
-      });
-      if (res.ok) {
-        setExplanationData(await res.json() as ExplanationData);
-      }
-    } catch {
-      // Silently fail — explanation is non-critical
-    } finally {
-      setLoadingExplanation(false);
-    }
-  };
-
   const handleSelect = (optionIndex: number) => {
     if (showResult) return;
     const next = [...answers];
     next[currentIndex] = optionIndex;
     setAnswers(next);
     setShowResult(true);
-    fetchExplanation(questions[currentIndex], optionIndex);
   };
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(i => i + 1);
       setShowResult(false);
-      setExplanationData(null);
     } else {
       setStep('done');
     }
@@ -124,7 +92,6 @@ export default function PracticePage() {
     setQuestions([]);
     setAnswers([]);
     setError(null);
-    setExplanationData(null);
   };
 
   const correctCount = answers.filter((a, i) => a === questions[i]?.correct_answer).length;
@@ -275,8 +242,6 @@ export default function PracticePage() {
             onSelect={handleSelect}
             isPractice={true}
             showResult={showResult}
-            explanationData={explanationData}
-            loadingExplanation={loadingExplanation}
           />
 
           {showResult && (
