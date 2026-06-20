@@ -190,7 +190,7 @@ export default function PracticePage() {
             ))}
           </div>
           <button
-            onClick={fetchQuestions}
+            onClick={() => fetchQuestions()}
             disabled={loading}
             className="mt-8 w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
