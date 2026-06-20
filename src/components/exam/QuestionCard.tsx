@@ -66,16 +66,30 @@ export function QuestionCard({
 
       {/* Passage for reading comprehension */}
       {question.passage && (
-        <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed text-slate-700 font-medium">
+        <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed text-slate-700 font-medium max-h-56 overflow-y-auto">
           <div className="text-xs text-slate-400 mb-2 font-normal">Reading Passage</div>
           {question.passage.text}
         </div>
       )}
 
-      {/* Question text */}
-      <div className="mb-6 text-lg font-semibold text-slate-900 leading-relaxed">
-        {question.text}
-      </div>
+      {/* Restatement banner — highlights original sentence */}
+      {question.type === 'restatement' && (
+        <div className="mb-4 px-4 py-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl">
+          <div className="text-xs text-amber-700 font-bold mb-2 uppercase tracking-wide">
+            📌 המשפט המקורי — מצא את הניסוח השקול:
+          </div>
+          <div className="text-base font-semibold text-amber-900 leading-relaxed" dir="ltr">
+            {question.text}
+          </div>
+        </div>
+      )}
+
+      {/* Question text — hidden for restatement (shown in banner above) */}
+      {question.type !== 'restatement' && (
+        <div className="mb-6 text-lg font-semibold text-slate-900 leading-relaxed">
+          {question.text}
+        </div>
+      )}
 
       {/* Options */}
       <div className="space-y-3">
@@ -125,10 +139,10 @@ export function QuestionCard({
             <p className="text-green-900 text-sm leading-relaxed">{explanation.correct_reason}</p>
           </div>
 
-          {/* Per-option analysis */}
+          {/* Elimination steps */}
           {explanation.options_analysis.length > 0 && (
             <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <div className="font-bold text-slate-700 text-sm mb-3">ניתוח כל האפשרויות:</div>
+              <div className="font-bold text-slate-700 text-sm mb-3">🔍 שלבי שלילה:</div>
               <div className="space-y-2">
                 {question.options.map((opt, i) => {
                   const correct = i === question.correct_answer;
@@ -137,8 +151,9 @@ export function QuestionCard({
                       key={i}
                       className={`flex gap-3 text-sm p-2.5 rounded-lg ${correct ? 'bg-green-50' : 'bg-red-50/60'}`}
                     >
-                      <span className={`font-bold flex-shrink-0 w-4 mt-0.5 ${correct ? 'text-green-600' : 'text-red-400'}`}>
-                        {correct ? '✓' : '✗'}
+                      <span className={`font-bold text-xs mt-0.5 flex-shrink-0 ${correct ? 'text-green-600' : 'text-red-400'}`}
+                        style={{ minWidth: '4.5rem' }}>
+                        {correct ? `✅ שלב ${i+1}: בחר` : `❌ שלב ${i+1}: שלל`}
                       </span>
                       <div dir="ltr" className="flex-1">
                         <span className="font-medium text-slate-800">{opt.text}</span>

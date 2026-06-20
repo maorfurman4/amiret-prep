@@ -86,12 +86,19 @@ export async function POST(req: NextRequest) {
     // ── Step 3: Fetch ONLY next section from DB at the adaptive difficulty ─────
     let nextQuestions: Question[] = [];
 
+    const usedQIds: string[] = (session.used_question_ids as string[] | null) ?? [];
+    const usedPIds: string[] = (session.used_passage_ids as string[] | null) ?? [];
+
     if (nextCfg.type === 'reading_comprehension') {
-      const { data: passages } = await supabase
+      let passagesQuery = supabase
         .from('passages')
         .select('id, text, difficulty_level, b')
         .eq('difficulty_level', nextDifficulty)
         .limit(20);
+      if (usedPIds.length > 0) {
+        passagesQuery = passagesQuery.not('id', 'in', `(${usedPIds.join(',')})`);
+      }
+      const { data: passages } = await passagesQuery;
 
       const passage = passages?.[Math.floor(Math.random() * (passages?.length ?? 1))];
       if (passage) {
@@ -106,19 +113,28 @@ export async function POST(req: NextRequest) {
           ...q,
           passage: { id: passage.id, text: passage.text, difficulty_level: passage.difficulty_level, b: passage.b },
         })) as Question[];
+
+        updatePayload.used_passage_ids = [...usedPIds, passage.id];
       }
     } else {
-      const { data: qs } = await supabase
+      let qQuery = supabase
         .from('questions')
         .select('*')
         .eq('type', nextCfg.type)
         .eq('difficulty_level', nextDifficulty)
         .limit(nextCfg.questionCount + 10);
+      if (usedQIds.length > 0) {
+        qQuery = qQuery.not('id', 'in', `(${usedQIds.join(',')})`);
+      }
+      const { data: qs } = await qQuery;
 
       nextQuestions = (qs ?? [])
         .sort(() => Math.random() - 0.5)
         .slice(0, nextCfg.questionCount) as Question[];
     }
+
+    const newQIds = nextQuestions.map(q => q.id);
+    updatePayload.used_question_ids = [...usedQIds, ...newQIds];
 
     // Write only the newly fetched section; keep completed sections for results page
     updatePayload.questions_by_section = {

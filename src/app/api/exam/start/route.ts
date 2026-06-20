@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
   // Server timer for Section 1
   const expiresAt = new Date(Date.now() + section1Cfg.durationSeconds * 1000).toISOString();
 
+  const section1QuestionIds = section1Questions.map(q => q.id);
+
   const { data: session, error: insertError } = await supabase
     .from('exam_sessions')
     .insert({
@@ -58,6 +60,8 @@ export async function POST(req: NextRequest) {
       questions_by_section: questionsBySection,
       answers_by_section: {},
       section_results: [],
+      used_question_ids: section1QuestionIds,
+      used_passage_ids: [],
     })
     .select()
     .single();

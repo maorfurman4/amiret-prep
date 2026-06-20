@@ -77,6 +77,8 @@ export interface ExamSession {
   section_results: SectionResult[];
   is_practice: boolean;
   questions_by_section: Record<number, Question[]>; // pre-loaded
+  used_question_ids?: string[];
+  used_passage_ids?: string[];
 }
 
 export interface ScoreClassification {

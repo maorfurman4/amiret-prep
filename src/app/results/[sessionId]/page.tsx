@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { classifyScore, SECTION_CONFIGS, type SectionResult, type Question } from '@/types/exam';
 import { thetaToScore } from '@/lib/adaptive';
@@ -58,8 +59,9 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
 
   const score = session.score ?? thetaToScore(session.theta_final ?? 0);
   const classification = classifyScore(score);
-  const totalCorrect = (session.section_results as SectionResult[]).reduce((a, s) => a + (s.correctCount ?? 0), 0);
-  const totalQuestions = (session.section_results as SectionResult[]).reduce((a, s) => a + (s.totalCount ?? 0), 0);
+  const sectionResults = session.section_results as SectionResult[];
+  const totalCorrect = sectionResults.reduce((a, s) => a + (s.correctCount ?? 0), 0);
+  const totalQuestions = sectionResults.reduce((a, s) => a + (s.totalCount ?? 0), 0);
 
   const TYPE_LABELS: Record<string, string> = {
     sentence_completion: 'השלמת משפטים',
@@ -67,6 +69,16 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
     reading_comprehension: 'הבנת הנקרא',
     esra: 'אנגלית ESRA',
   };
+
+  // Aggregate by question type
+  const byType: Record<string, { correct: number; total: number }> = {};
+  for (const sr of sectionResults) {
+    const cfg = SECTION_CONFIGS[sr.sectionIndex - 1];
+    const t = cfg?.type ?? sr.type;
+    if (!byType[t]) byType[t] = { correct: 0, total: 0 };
+    byType[t].correct += sr.correctCount ?? 0;
+    byType[t].total += sr.totalCount ?? 0;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4" dir="rtl">
@@ -102,11 +114,28 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
           ))}
         </div>
 
-        {/* Section breakdown */}
+        {/* Breakdown by question type */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-          <h2 className="font-bold text-slate-900 mb-4">פירוט לפי פרק</h2>
+          <h2 className="font-bold text-slate-900 mb-4">פירוט לפי סוג שאלה</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            {Object.entries(byType).map(([type, { correct, total }]) => {
+              const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+              const color = pct >= 75 ? 'text-green-600 bg-green-50 border-green-200'
+                : pct >= 50 ? 'text-yellow-600 bg-yellow-50 border-yellow-200'
+                : 'text-red-600 bg-red-50 border-red-200';
+              return (
+                <div key={type} className={`p-3 rounded-xl border text-center ${color}`}>
+                  <div className="text-2xl font-black">{correct}/{total}</div>
+                  <div className="text-xs font-semibold mt-1">{TYPE_LABELS[type] ?? type}</div>
+                  <div className="text-xs opacity-75">{pct}%</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <h3 className="font-semibold text-slate-700 text-sm mb-3">פירוט לפי פרק</h3>
           <div className="space-y-3">
-            {(session.section_results as SectionResult[]).map((sr) => {
+            {sectionResults.map((sr) => {
               const cfg = SECTION_CONFIGS[sr.sectionIndex - 1];
               const pct = Math.round((sr.correctCount / sr.totalCount) * 100);
               return (
@@ -134,6 +163,18 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
             })}
           </div>
         </div>
+
+        {/* Review all questions */}
+        <Link href={`/review/${sessionId}`} className="block">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4 hover:bg-blue-100 transition-colors cursor-pointer">
+            <div className="text-3xl">📖</div>
+            <div>
+              <div className="font-bold text-blue-900">עבור על כל השאלות ולמד מהטעויות</div>
+              <div className="text-blue-600 text-sm">ראה הסברים מפורטים לכל שאלה עם שלבי שלילה</div>
+            </div>
+            <div className="mr-auto text-blue-400 text-xl">›</div>
+          </div>
+        </Link>
 
         {/* AI Explanations */}
         {!session.is_practice && (

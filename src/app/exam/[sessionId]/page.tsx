@@ -66,6 +66,18 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     if (guestId !== undefined) loadSession();
   }, [loadSession]);
 
+  // Warn before leaving mid-exam (non-practice only)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (session && !session.is_practice && !session.completed_at) {
+        e.preventDefault();
+        e.returnValue = 'המבחן בעיצומו — יציאה עלולה לגרום לאיבוד הנתונים. להמשיך?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [session]);
+
   const currentSection = session?.current_section_index ?? 1;
   const currentCfg = SECTION_CONFIGS[currentSection - 1];
   const currentQuestions = (session?.questions_by_section[currentSection] ?? []) as Question[];
