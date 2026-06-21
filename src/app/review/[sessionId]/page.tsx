@@ -28,6 +28,7 @@ export default function ReviewPage({ params }: { params: Promise<{ sessionId: st
   const { sessionId } = use(params);
   const router = useRouter();
   const [data, setData] = useState<ReviewData | null>(null);
+  const [fetchError, setFetchError] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
   const questionRef = useRef<HTMLDivElement>(null);
@@ -35,9 +36,21 @@ export default function ReviewPage({ params }: { params: Promise<{ sessionId: st
   useEffect(() => {
     const guestId = localStorage.getItem('amiret_guest_id') ?? '';
     fetch(`/api/exam/review?sessionId=${sessionId}&guestId=${encodeURIComponent(guestId)}`)
-      .then(r => r.json())
-      .then((d: ReviewData) => setData(d));
+      .then(r => { if (!r.ok) throw new Error('fetch failed'); return r.json(); })
+      .then((d: ReviewData) => setData(d))
+      .catch(() => setFetchError(true));
   }, [sessionId]);
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50" dir="rtl">
+        <div className="text-center">
+          <div className="text-red-500 text-xl mb-3">שגיאה בטעינת השאלות</div>
+          <button onClick={() => { setFetchError(false); window.location.reload(); }} className="text-blue-600 underline text-sm">נסה שוב</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (
@@ -48,6 +61,9 @@ export default function ReviewPage({ params }: { params: Promise<{ sessionId: st
   }
 
   const { questions, selectedAnswers } = data;
+
+  const wrongCount = questions.filter((q, i) => selectedAnswers[i] !== q.correct_answer).length;
+  const correctCount = questions.length - wrongCount;
 
   // Filtered indices
   const filteredIndices = questions
@@ -96,9 +112,9 @@ export default function ReviewPage({ params }: { params: Promise<{ sessionId: st
           {/* Filter tabs */}
           <div className="flex gap-2 mt-3">
             {([
-              { value: 'all', label: 'הכל' },
-              { value: 'wrong', label: '❌ טעויות בלבד' },
-              { value: 'correct', label: '✅ נכון בלבד' },
+              { value: 'all', label: `הכל (${questions.length})` },
+              { value: 'wrong', label: `❌ טעויות (${wrongCount})` },
+              { value: 'correct', label: `✅ נכון (${correctCount})` },
             ] as { value: Filter; label: string }[]).map(opt => (
               <button
                 key={opt.value}

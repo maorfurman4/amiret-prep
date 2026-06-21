@@ -48,9 +48,9 @@ export function QuestionCard({
     ?? null;
 
   return (
-    <div className="w-full max-w-2xl mx-auto" dir="ltr">
+    <div className="w-full max-w-2xl mx-auto">
       {/* Question header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4" dir="rtl">
         <span className="text-sm text-slate-500 font-medium">
           שאלה {questionNumber} מתוך {totalInSection}
         </span>
@@ -76,10 +76,15 @@ export function QuestionCard({
         </div>
       )}
 
-      {/* Restatement — show sentence plainly */}
+      {/* Restatement — amber banner + original sentence */}
       {question.type === 'restatement' && (
-        <div className="mb-6 text-lg font-semibold text-slate-900 leading-relaxed" dir="ltr">
-          {question.text}
+        <div className="mb-6 px-4 py-3 bg-amber-50 border-r-4 border-amber-400 rounded-xl" dir="rtl">
+          <div className="text-xs text-amber-700 font-bold mb-2 uppercase tracking-wide">
+            📌 המשפט המקורי — מצא את הניסוח השקול:
+          </div>
+          <div className="text-base font-semibold text-amber-900 leading-relaxed" dir="ltr">
+            {question.text}
+          </div>
         </div>
       )}
 

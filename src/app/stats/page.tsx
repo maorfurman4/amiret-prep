@@ -196,8 +196,8 @@ export default function StatsPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
             <h2 className="font-bold text-slate-900 mb-4">ביצועים לפי סוג שאלה</h2>
             <div className="space-y-3">
-              {Object.entries(stats.performance_by_type).map(([type, data]) => {
-                const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+              {Object.entries(stats.performance_by_type).filter(([, d]) => d.total > 0).map(([type, data]) => {
+                const pct = Math.round((data.correct / data.total) * 100);
                 return (
                   <div key={type}>
                     <div className="flex justify-between text-sm mb-1">

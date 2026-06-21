@@ -200,7 +200,7 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
           <div className="space-y-3">
             {sectionResults.map((sr) => {
               const cfg = SECTION_CONFIGS[sr.sectionIndex - 1];
-              const pct = Math.round((sr.correctCount / sr.totalCount) * 100);
+              const pct = sr.totalCount > 0 ? Math.round((sr.correctCount / sr.totalCount) * 100) : 0;
               return (
                 <div key={sr.sectionIndex} className="flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold flex-shrink-0">
@@ -239,8 +239,8 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
           </div>
         </Link>
 
-        {/* AI Explanations */}
-        {!session.is_practice && (
+        {/* AI Explanations — only when there are mistakes */}
+        {!session.is_practice && totalCorrect < totalQuestions && (
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-900">הסברים על טעויות</h2>

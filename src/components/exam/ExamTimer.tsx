@@ -9,7 +9,7 @@ interface ExamTimerProps {
 }
 
 export function ExamTimer({ expiresAt, isPractice, onExpire }: ExamTimerProps) {
-  const [remainingMs, setRemainingMs] = useState<number>(0);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
@@ -37,6 +37,10 @@ export function ExamTimer({ expiresAt, isPractice, onExpire }: ExamTimerProps) {
     return () => clearInterval(interval);
   }, [expiresAt, isPractice, computeRemaining]);
 
+  if (remainingMs === null && !isPractice) {
+    return <div className="w-24 h-10 rounded-xl bg-slate-100 animate-pulse" />;
+  }
+
   if (isPractice) {
     return (
       <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-sm font-medium">
@@ -46,11 +50,12 @@ export function ExamTimer({ expiresAt, isPractice, onExpire }: ExamTimerProps) {
     );
   }
 
-  const seconds = Math.ceil(remainingMs / 1000);
+  const ms = remainingMs ?? 0;
+  const seconds = Math.ceil(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  const isWarning = remainingMs <= WARN_THRESHOLD && remainingMs > 0;
-  const isExpired = remainingMs === 0;
+  const isWarning = ms <= WARN_THRESHOLD && ms > 0;
+  const isExpired = ms === 0 && remainingMs !== null;
 
   return (
     <div className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl font-mono transition-all ${

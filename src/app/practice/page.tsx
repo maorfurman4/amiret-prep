@@ -56,6 +56,7 @@ export default function PracticePage() {
   // Exam mode timer
   const [timeLeft, setTimeLeft]       = useState<number>(0);
   const timerRef                      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerStartedRef               = useRef(false);
 
   const fetchQuestions = async (overrideDiff?: Difficulty) => {
     setLoading(true);
@@ -139,6 +140,7 @@ export default function PracticePage() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     const duration = EXAM_TIMER_SECONDS[selectedType];
+    timerStartedRef.current = false;
     setTimeLeft(duration);
 
     timerRef.current = setInterval(() => {
@@ -146,8 +148,10 @@ export default function PracticePage() {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
           timerRef.current = null;
+          timerStartedRef.current = true;
           return 0;
         }
+        timerStartedRef.current = true;
         return prev - 1;
       });
     }, 1000);
@@ -158,9 +162,9 @@ export default function PracticePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, examMode, selectedType, currentIndex]);
 
-  // Auto-advance when timeLeft hits 0 in exam mode
+  // Auto-advance when timeLeft hits 0 in exam mode (only after timer actually started)
   useEffect(() => {
-    if (!examMode || step !== 'practicing' || timeLeft !== 0) return;
+    if (!examMode || step !== 'practicing' || timeLeft !== 0 || !timerStartedRef.current) return;
     handleNext();
   }, [timeLeft, examMode, step, handleNext]);
 

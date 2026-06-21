@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, use } from 'react';
+import { useEffect, useState, useCallback, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExamTimer } from '@/components/exam/ExamTimer';
 import { QuestionCard } from '@/components/exam/QuestionCard';
@@ -25,12 +25,13 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   // Practice mode: track which question indices have been answered (locked)
   const [lockedAnswers, setLockedAnswers] = useState<Set<number>>(new Set());
 
-  const [guestId, setGuestId] = useState('');
+  const [guestId, setGuestId] = useState<string | null>(null);
 
   // Read guestId after hydration — avoids SSR/client mismatch
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
   // Load or recover session state from server
   const loadSession = useCallback(async () => {
-    const res = await fetch(`/api/exam/state?sessionId=${sessionId}&guestId=${encodeURIComponent(guestId)}`);
+    const res = await fetch(`/api/exam/state?sessionId=${sessionId}&guestId=${encodeURIComponent(guestId ?? '')}`);
     if (!res.ok) { setError('לא ניתן לטעון את המבחן'); return; }
     const data = await res.json() as { session: SessionState; remainingMs: number; timerExpired: boolean };
 
@@ -61,9 +62,9 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     }
   }, [sessionId, guestId]); // guestId must be here — loaded async after hydration
 
-  // Only run once guestId is resolved (avoids empty-string fetch on SSR)
+  // Only run once guestId is resolved (null = not yet read from localStorage)
   useEffect(() => {
-    if (guestId !== undefined) loadSession();
+    if (guestId !== null) loadSession();
   }, [loadSession]);
 
   // Warn before leaving mid-exam (non-practice only)
@@ -97,7 +98,8 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   };
 
   const submitSection = useCallback(async (sess: SessionState, sectionAnswers: (number | null)[]) => {
-    if (isSubmitting) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -125,9 +127,10 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     } catch {
       setError('שגיאה בשליחת התשובות. נסה שוב.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [isSubmitting, loadSession, router]);
+  }, [loadSession, router]);
 
   const handleTimerExpire = useCallback(() => {
     if (!session) return;
@@ -234,10 +237,11 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
               <button
                 key={i}
                 onClick={() => setCurrentQuestionIndex(i)}
+                aria-label={`שאלה ${i + 1}${answers[i] === null ? ' — לא נענתה' : ''}`}
                 className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${
-                  i === currentQuestionIndex ? 'bg-blue-600 text-white scale-110' :
+                  i === currentQuestionIndex ? 'bg-blue-600 text-white scale-110 ring-2 ring-blue-300' :
                   answers[i] !== null ? 'bg-blue-100 text-blue-700' :
-                  'bg-slate-200 text-slate-500 hover:bg-slate-300'
+                  'bg-slate-100 text-slate-400 border-2 border-dashed border-slate-300 hover:border-slate-400'
                 }`}
               >
                 {i + 1}

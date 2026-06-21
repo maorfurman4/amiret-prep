@@ -51,6 +51,7 @@ export function UserMenu() {
   }
 
   const initial = (user.email ?? user.user_metadata?.full_name ?? '?')[0].toUpperCase();
+  const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -59,9 +60,14 @@ export function UserMenu() {
         className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400"
         aria-label="תפריט משתמש"
       >
-        <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold select-none">
-          {initial}
-        </div>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt={initial} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold select-none">
+            {initial}
+          </div>
+        )}
       </button>
 
       {open && (
