@@ -35,7 +35,7 @@ export default function HomePage() {
           <Link href="/stats" className="flex flex-col items-center gap-2 py-5 bg-white/10 hover:bg-white/20 rounded-2xl text-center transition-colors">
             <span className="text-3xl">📊</span>
             <span className="font-semibold text-sm">הסטטיסטיקה שלי</span>
-            <span className="text-slate-400 text-xs">מצריך כניסה 🔑</span>
+            <span className="text-slate-400 text-xs">היסטוריה וגרפים</span>
           </Link>
         </div>
 
