@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google';
 import './globals.css';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { UserMenu } from '@/components/UserMenu';
+import { BottomNav } from '@/components/BottomNav';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 
@@ -22,11 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})()` }} />
       </head>
-      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-900">
+      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-900 pb-16 md:pb-0">
         <div className="fixed top-3 left-3 z-50 flex items-center gap-2">
           <UserMenu />
         </div>
         {children}
+        <BottomNav />
         <ThemeToggle />
       </body>
     </html>

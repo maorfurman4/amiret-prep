@@ -1,0 +1,62 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+const TABS = [
+  { href: '/',            icon: '🏠', label: 'בית'       },
+  { href: '/exam',        icon: '🎯', label: 'מבחן'      },
+  { href: '/practice',    icon: '✏️', label: 'תרגול'    },
+  { href: '/review-queue',icon: '🔄', label: 'חזרה'      },
+  { href: '/stats',       icon: '📊', label: 'סטטיסטיקה' },
+];
+
+// Hide during active exam/review sessions
+function shouldHide(pathname: string): boolean {
+  // /exam/[sessionId] — active exam
+  if (/^\/exam\/[^/]+/.test(pathname)) return true;
+  // /review/[sessionId] — reviewing past session
+  if (/^\/review\/[^/]+/.test(pathname)) return true;
+  return false;
+}
+
+export function BottomNav() {
+  const pathname = usePathname();
+  if (shouldHide(pathname)) return null;
+
+  return (
+    <nav
+      className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 md:hidden"
+      dir="rtl"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="flex">
+        {TABS.map(tab => {
+          const active =
+            tab.href === '/'
+              ? pathname === '/'
+              : pathname === tab.href || pathname.startsWith(tab.href + '/');
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`relative flex-1 flex flex-col items-center pt-2 pb-1 gap-0.5 transition-colors ${
+                active
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-500 dark:text-slate-400 active:text-slate-900 dark:active:text-white'
+              }`}
+            >
+              {active && (
+                <span className="absolute top-0 inset-x-2 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-b-full" />
+              )}
+              <span className="text-xl leading-none">{tab.icon}</span>
+              <span className={`text-[10px] leading-tight ${active ? 'font-bold' : 'font-medium'}`}>
+                {tab.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
