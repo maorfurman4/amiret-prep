@@ -41,10 +41,22 @@ export async function POST(req: NextRequest) {
   const currentQuestions = questionsBySection[body.sectionIndex] ?? [];
   const cfg = SECTION_CONFIGS[body.sectionIndex - 1];
 
-  // ── Step 1: Update θ via MLE/EAP ────────────────────────────────────────────
-  const sectionForAdaptive = { questions: currentQuestions, answers: body.answers };
+  // ── Step 1: Update θ via MLE/EAP (cumulative — all sections, not just current) ─
+  // Using only 3–5 items per section makes MLE extremely noisy; one bad RC section
+  // can swing θ by ±2. Accumulating all responses gives a stable, accurate estimate.
+  const previousResults = (session.section_results as SectionResult[]);
+  const allQuestions: Question[] = [
+    ...previousResults.flatMap(sr => sr.questions as Question[]),
+    ...currentQuestions,
+  ];
+  const allAnswers: (number | null)[] = [
+    ...previousResults.flatMap(sr => sr.answers as (number | null)[]),
+    ...body.answers,
+  ];
+  const sectionForAdaptive = { questions: allQuestions, answers: allAnswers };
   const newTheta = updateThetaAfterSection(session.theta, sectionForAdaptive);
 
+  const currentSectionResult = { questions: currentQuestions, answers: body.answers };
   const result: SectionResult = {
     sectionIndex: body.sectionIndex,
     type: cfg.type,
@@ -52,7 +64,7 @@ export async function POST(req: NextRequest) {
     answers: body.answers,
     thetaBefore: session.theta,
     thetaAfter: newTheta,
-    correctCount: correctCount(sectionForAdaptive),
+    correctCount: correctCount(currentSectionResult),
     totalCount: currentQuestions.length,
   };
 
