@@ -14,7 +14,8 @@ export function UserMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    // getSession reads from localStorage immediately — no network call needed
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);

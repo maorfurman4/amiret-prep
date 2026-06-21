@@ -10,17 +10,31 @@ function CallbackHandler() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const code = searchParams.get('code');
     const next = searchParams.get('next') ?? '/';
     const safeNext = next.startsWith('/') ? next : '/';
 
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code)
-        .then(() => router.replace(safeNext))
-        .catch(() => router.replace('/auth/login?error=callback'));
-    } else {
+    // With flowType: 'implicit', Supabase puts the session in the URL hash.
+    // detectSessionInUrl: true auto-processes it and fires SIGNED_IN.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.replace(safeNext);
+      }
+    });
+
+    // Fallback: if already signed in or no hash event fires
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace(safeNext);
+    });
+
+    // Last resort timeout
+    const timer = setTimeout(() => {
       router.replace(safeNext);
-    }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
