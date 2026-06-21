@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 
 function LoginForm() {
   const supabase = createClient();
@@ -21,6 +22,16 @@ function LoginForm() {
   const [signUpDone, setSignUpDone] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user ?? null));
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+  };
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
@@ -71,6 +82,37 @@ function LoginForm() {
     }
     setLoading(false);
   };
+
+  // ── Already logged in ─────────────────────────────────────────────────────
+  if (currentUser) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="text-5xl">👤</div>
+        <h2 className="text-xl font-bold text-slate-900">כבר מחובר</h2>
+        <p className="text-slate-500 text-sm">
+          מחובר בתור<br />
+          <span className="font-semibold text-slate-700">{currentUser.email}</span>
+        </p>
+        <button
+          onClick={() => router.push('/')}
+          className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+        >
+          חזרה לדף הבית
+        </button>
+        <button
+          onClick={handleSignOut}
+          className="w-full py-2.5 border border-slate-300 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+        >
+          יציאה מהחשבון
+        </button>
+      </div>
+    );
+  }
+
+  // Still loading auth state
+  if (currentUser === undefined) {
+    return <div className="text-center text-slate-400 py-8">טוען...</div>;
+  }
 
   // ── Sign-up success ────────────────────────────────────────────────────────
   if (signUpDone) {
