@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
     : (Math.max(1, Math.min(5, parseInt(diffParam, 10))) as DifficultyLevel);
 
   if (type === 'reading_comprehension') {
-    const { data: passages } = await supabase
-      .from('passages')
-      .select('id, text, difficulty_level, b')
-      .eq('difficulty_level', difficulty)
-      .limit(10);
+    // For random: pick a random passage from any difficulty level
+    let passageQuery = supabase.from('passages').select('id, text, difficulty_level, b').limit(20);
+    if (diffParam !== 'random') passageQuery = passageQuery.eq('difficulty_level', difficulty);
+
+    const { data: passages } = await passageQuery;
 
     if (!passages?.length) {
       return NextResponse.json({ error: 'No passages found for this difficulty' }, { status: 404 });
@@ -55,10 +55,27 @@ export async function GET(req: NextRequest) {
       passage: { id: passage.id, text: passage.text, difficulty_level: passage.difficulty_level, b: passage.b },
     })) as Question[];
 
-    return NextResponse.json({ questions, difficulty });
+    return NextResponse.json({ questions, difficulty: passage.difficulty_level });
   }
 
   // sentence_completion or restatement
+  if (diffParam === 'random') {
+    // Random mode: fetch questions from ALL difficulty levels and mix them
+    const LEVELS: DifficultyLevel[] = [1, 2, 3, 4, 5];
+    const perLevel = Math.ceil((count * 2) / 5); // fetch extra per level then trim
+    const fetches = await Promise.all(
+      LEVELS.map(lv =>
+        supabase.from('questions').select('*').eq('type', type).eq('difficulty_level', lv).limit(perLevel + 5)
+      )
+    );
+    const pool = fetches.flatMap(r => r.data ?? []) as Question[];
+    if (!pool.length) {
+      return NextResponse.json({ error: 'No questions found' }, { status: 404 });
+    }
+    const questions = pool.sort(() => Math.random() - 0.5).slice(0, count);
+    return NextResponse.json({ questions, difficulty: 'random' });
+  }
+
   const { data: qs } = await supabase
     .from('questions')
     .select('*')

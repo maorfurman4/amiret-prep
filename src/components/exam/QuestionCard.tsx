@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Question } from '@/types/exam';
 
 interface ExplanationData {
@@ -14,7 +15,6 @@ function parseExplanation(raw: string | undefined): ExplanationData | null {
     const parsed = JSON.parse(raw) as ExplanationData;
     if (parsed.correct_reason && Array.isArray(parsed.options_analysis)) return parsed;
   } catch {
-    // plain text — wrap it
     return { correct_reason: raw, options_analysis: [], strategy: '' };
   }
   return null;
@@ -41,7 +41,11 @@ export function QuestionCard({
   isPractice = false,
   showResult = false,
 }: QuestionCardProps) {
+  const [hintVisible, setHintVisible] = useState(false);
   const explanation = isPractice && showResult ? parseExplanation(question.explanation) : null;
+  const hintStrategy = (question as Question & { hint?: string }).hint
+    ?? parseExplanation(question.explanation)?.strategy
+    ?? null;
 
   return (
     <div className="w-full max-w-2xl mx-auto" dir="ltr">
@@ -79,7 +83,7 @@ export function QuestionCard({
         </div>
       )}
 
-      {/* Question text — hidden for restatement (shown in banner above) */}
+      {/* Question text */}
       {question.type !== 'restatement' && (
         <div className="mb-6 text-lg font-semibold text-slate-900 leading-relaxed">
           {question.text}
@@ -122,10 +126,32 @@ export function QuestionCard({
         })}
       </div>
 
-      {/* Practice explanation — shown immediately from DB data, no API call */}
+      {/* Hint — practice only, before answer */}
+      {isPractice && !showResult && hintStrategy && (
+        <div className="mt-4" dir="rtl">
+          {!hintVisible ? (
+            <button
+              onClick={() => setHintVisible(true)}
+              className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1.5 transition-colors"
+            >
+              <span>💡</span>
+              <span>רמז — כיוון לפתרון</span>
+            </button>
+          ) : (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">💡</span>
+                <span className="text-xs font-bold text-amber-700">רמז — כיוון לפתרון</span>
+              </div>
+              <p className="text-sm text-amber-900 leading-relaxed">{hintStrategy}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Practice explanation — after answer */}
       {isPractice && showResult && explanation && (
         <div className="mt-6 space-y-3" dir="rtl">
-          {/* Why correct */}
           <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">✅</span>
@@ -134,7 +160,6 @@ export function QuestionCard({
             <p className="text-green-900 text-sm leading-relaxed">{explanation.correct_reason}</p>
           </div>
 
-          {/* Elimination steps */}
           {explanation.options_analysis.length > 0 && (
             <div className="p-4 bg-white border border-slate-200 rounded-xl">
               <div className="font-bold text-slate-700 text-sm mb-3">🔍 שלבי שלילה:</div>
@@ -165,7 +190,6 @@ export function QuestionCard({
             </div>
           )}
 
-          {/* Strategy tip */}
           {explanation.strategy && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex items-center gap-2 mb-2">

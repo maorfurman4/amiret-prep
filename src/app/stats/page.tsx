@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
-import { classifyScore } from '@/types/exam';
+import { classifyScore, SECTION_CONFIGS, type SectionResult } from '@/types/exam';
 import { BackNav } from '@/components/BackNav';
 
 interface Stats {
@@ -13,6 +13,11 @@ interface Stats {
   performance_by_type: Record<string, { correct: number; total: number }>;
 }
 
+interface WeaknessData {
+  byType: Record<string, { correct: number; total: number }>;
+  byDifficulty: Record<string, { correct: number; total: number }>;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   sentence_completion: 'השלמת משפטים',
   restatement: 'ניסוח מחדש',
@@ -20,23 +25,71 @@ const TYPE_LABELS: Record<string, string> = {
   esra: 'אנגלית ESRA',
 };
 
+const DIFFICULTY_LABELS: Record<string, string> = {
+  easy: 'קל',
+  medium: 'בינוני',
+  hard: 'קשה',
+};
+
 export default function StatsPage() {
   const supabase = createClient();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [weakness, setWeakness] = useState<WeaknessData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-        .then(({ data }) => {
-          setStats(data as Stats);
-          setLoading(false);
-        });
+
+      // Fetch user_stats and recent exam sessions in parallel
+      Promise.all([
+        supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', user.id)
+          .single(),
+        supabase
+          .from('exam_sessions')
+          .select('section_results')
+          .eq('user_id', user.id)
+          .eq('is_practice', false)
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ]).then(([statsRes, sessionsRes]) => {
+        setStats(statsRes.data as Stats);
+
+        // Aggregate weakness data from recent sessions
+        if (sessionsRes.data && sessionsRes.data.length > 0) {
+          const byType: Record<string, { correct: number; total: number }> = {};
+          const byDifficulty: Record<string, { correct: number; total: number }> = {};
+
+          for (const session of sessionsRes.data) {
+            const sectionResults = (session.section_results ?? []) as SectionResult[];
+            for (const sr of sectionResults) {
+              // Aggregate by question type
+              const cfg = SECTION_CONFIGS[sr.sectionIndex - 1];
+              const t = cfg?.type ?? sr.type;
+              if (t) {
+                if (!byType[t]) byType[t] = { correct: 0, total: 0 };
+                byType[t].correct += sr.correctCount ?? 0;
+                byType[t].total += sr.totalCount ?? 0;
+              }
+
+              // Aggregate by difficulty if available
+              const difficulty = (sr as unknown as { difficulty?: string }).difficulty;
+              if (difficulty) {
+                if (!byDifficulty[difficulty]) byDifficulty[difficulty] = { correct: 0, total: 0 };
+                byDifficulty[difficulty].correct += sr.correctCount ?? 0;
+                byDifficulty[difficulty].total += sr.totalCount ?? 0;
+              }
+            }
+          }
+
+          setWeakness({ byType, byDifficulty });
+        }
+
+        setLoading(false);
+      });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -66,6 +119,15 @@ export default function StatsPage() {
   }
 
   const classification = stats.best_score ? classifyScore(stats.best_score) : null;
+
+  // Find weakest type for the weakness analysis section
+  const weakestType = weakness && Object.keys(weakness.byType).length > 0
+    ? Object.entries(weakness.byType).reduce((worst, [type, data]) => {
+        const pct = data.total > 0 ? data.correct / data.total : 1;
+        const worstPct = worst.data.total > 0 ? worst.data.correct / worst.data.total : 1;
+        return pct < worstPct ? { type, data } : worst;
+      }, { type: Object.keys(weakness.byType)[0], data: Object.values(weakness.byType)[0] })
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50" dir="rtl">
@@ -149,8 +211,81 @@ export default function StatsPage() {
             </div>
           </div>
         )}
+
+        {/* Weakness Analysis */}
+        {weakness && Object.keys(weakness.byType).length > 0 && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+            <h2 className="font-bold text-slate-900 mb-1">ניתוח חולשות</h2>
+            <p className="text-slate-400 text-xs mb-4">מבוסס על 10 המבחנים האחרונים שלך</p>
+
+            {/* By question type */}
+            <div className="space-y-3 mb-5">
+              {Object.entries(weakness.byType).map(([type, data]) => {
+                const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+                const isWeakest = weakestType?.type === type;
+                const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500';
+                return (
+                  <div
+                    key={type}
+                    className={`p-3 rounded-xl ${isWeakest ? 'bg-red-50 border border-red-200' : 'bg-slate-50 border border-slate-100'}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-800">
+                          {TYPE_LABELS[type] ?? type}
+                        </span>
+                        {isWeakest && (
+                          <span className="text-xs text-red-600 font-semibold">⚠️ כאן כדאי להתמרכז</span>
+                        )}
+                      </div>
+                      <span className={`text-sm font-bold ${pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {pct}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-400 w-16 text-left flex-shrink-0">
+                        {data.correct}/{data.total}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* By difficulty if available */}
+            {Object.keys(weakness.byDifficulty).length > 0 && (
+              <>
+                <h3 className="font-semibold text-slate-700 text-sm mb-3">לפי רמת קושי</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {(['easy', 'medium', 'hard'] as const).map(diff => {
+                    const data = weakness.byDifficulty[diff];
+                    if (!data) return null;
+                    const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+                    const color = pct >= 80
+                      ? 'text-green-700 bg-green-50 border-green-200'
+                      : pct >= 60
+                      ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                      : 'text-red-700 bg-red-50 border-red-200';
+                    return (
+                      <div key={diff} className={`p-3 rounded-xl border text-center ${color}`}>
+                        <div className="text-xl font-black">{pct}%</div>
+                        <div className="text-xs font-semibold mt-0.5">{DIFFICULTY_LABELS[diff]}</div>
+                        <div className="text-xs opacity-70 mt-0.5">{data.correct}/{data.total}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

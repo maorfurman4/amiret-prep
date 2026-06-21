@@ -135,6 +135,7 @@ export default function VocabularyPage() {
   const [known, setKnown] = useState<Set<string>>(new Set());
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<Mode>('flashcard');
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Filters
   const [filterCat, setFilterCat] = useState<string>('');
@@ -178,6 +179,37 @@ export default function VocabularyPage() {
   const [timedWordCount, setTimedWordCount] = useState<5 | 10 | 20>(10);
   const [timedTimePerWord, setTimedTimePerWord] = useState<10 | 15 | 20 | 30>(20);
   const [showTimedConfig, setShowTimedConfig] = useState(false);
+
+  // ─── Load auth user ────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Sync known/favorites from DB when user logs in ───────────────────────
+  useEffect(() => {
+    if (!userId) return;
+    Promise.all([
+      supabase.from('user_vocab_known').select('word_id').eq('user_id', userId),
+      supabase.from('user_vocab_favorites').select('word_id').eq('user_id', userId),
+    ]).then(([knownRes, favRes]) => {
+      if (knownRes.data) {
+        const s = new Set(knownRes.data.map((r: { word_id: string }) => r.word_id));
+        setKnown(s);
+        saveSet(STORAGE_KEY, s);
+      }
+      if (favRes.data) {
+        const s = new Set(favRes.data.map((r: { word_id: string }) => r.word_id));
+        setFavorites(s);
+        saveSet(FAV_KEY, s);
+      }
+    });
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Load from storage and DB ──────────────────────────────────────────────
   useEffect(() => {
@@ -421,10 +453,18 @@ export default function VocabularyPage() {
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const next = new Set(favorites);
-    if (next.has(id)) next.delete(id);
+    const removing = next.has(id);
+    if (removing) next.delete(id);
     else next.add(id);
     setFavorites(next);
     saveSet(FAV_KEY, next);
+    if (userId) {
+      if (removing) {
+        supabase.from('user_vocab_favorites').delete().eq('user_id', userId).eq('word_id', id).then();
+      } else {
+        supabase.from('user_vocab_favorites').upsert({ user_id: userId, word_id: id }).then();
+      }
+    }
   };
 
   // ─── Flashcard handlers ────────────────────────────────────────────────────
@@ -432,10 +472,11 @@ export default function VocabularyPage() {
 
   const handleKnew = useCallback(() => {
     if (!current) return;
+    const wordId = current.id;
     setAnimating('right');
     setTimeout(() => {
       const next = new Set(known);
-      next.add(current.id);
+      next.add(wordId);
       setKnown(next);
       saveSet(STORAGE_KEY, next);
       setDeck(prev => prev.slice(1));
@@ -443,8 +484,11 @@ export default function VocabularyPage() {
       setShowHint(false);
       setDragX(0);
       setAnimating(null);
+      if (userId) {
+        supabase.from('user_vocab_known').upsert({ user_id: userId, word_id: wordId }).then();
+      }
     }, 280);
-  }, [current, known]);
+  }, [current, known, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUnknown = useCallback(() => {
     if (!current) return;
@@ -463,12 +507,18 @@ export default function VocabularyPage() {
     next.delete(wordId);
     setKnown(next);
     saveSet(STORAGE_KEY, next);
+    if (userId) {
+      supabase.from('user_vocab_known').delete().eq('user_id', userId).eq('word_id', wordId).then();
+    }
   };
 
   const handleResetAll = () => {
     setKnown(new Set());
     saveSet(STORAGE_KEY, new Set());
     setShowKnownList(false);
+    if (userId) {
+      supabase.from('user_vocab_known').delete().eq('user_id', userId).then();
+    }
   };
 
   const onDragStart = (clientX: number) => { dragStartX.current = clientX; };

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { ExamMode } from '@/types/exam';
 import { BackNav } from '@/components/BackNav';
 
@@ -38,6 +39,13 @@ export default function ExamModePage() {
     return id;
   };
 
+  // Ensure guestId exists on first visit
+  useEffect(() => {
+    if (!localStorage.getItem('amiret_guest_id')) {
+      localStorage.setItem('amiret_guest_id', crypto.randomUUID());
+    }
+  }, []);
+
   const startExam = async (mode: ExamMode, isPractice = false) => {
     setLoading(true);
     setError(null);
@@ -70,17 +78,17 @@ export default function ExamModePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col" dir="rtl">
       <BackNav backHref="/" backLabel="דף הבית" />
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">בחר מצב</h1>
-          <p className="text-slate-500">בחר איך תרצה להתאמן היום</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">בחר מצב</h1>
+          <p className="text-slate-500 dark:text-slate-400">בחר איך תרצה להתאמן היום</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 text-sm text-center">
             {error}
           </div>
         )}
@@ -91,13 +99,49 @@ export default function ExamModePage() {
               key={m.mode}
               onClick={() => startExam(m.mode, m.isPractice)}
               disabled={loading}
-              className="group text-right p-6 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all disabled:opacity-60"
+              className="group text-right p-6 bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all disabled:opacity-60"
             >
               <div className="text-3xl mb-3">{m.icon}</div>
-              <div className="text-lg font-bold text-slate-900 mb-1">{m.title}</div>
-              <div className="text-sm text-slate-500 leading-relaxed">{m.desc}</div>
+              <div className="text-lg font-bold text-slate-900 dark:text-white mb-1">{m.title}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{m.desc}</div>
             </button>
           ))}
+        </div>
+
+        {/* Review queue */}
+        <div className="mt-4">
+          <button
+            onClick={() => router.push('/review-queue')}
+            className="w-full text-right p-6 bg-orange-50 dark:bg-orange-900/20 rounded-2xl border-2 border-orange-200 dark:border-orange-700 hover:border-orange-400 hover:shadow-md transition-all flex items-center gap-4"
+          >
+            <span className="text-3xl">🔁</span>
+            <div>
+              <div className="text-lg font-bold text-orange-900 dark:text-orange-200 mb-1">חזרה על טעויות</div>
+              <div className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">חזור על שאלות שטעית בהן — מערכת חזרה מרווחת</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Vocabulary link */}
+        <div className="mt-4 text-center">
+          <Link
+            href="/vocabulary"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-sm transition-all text-sm text-slate-600 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400"
+          >
+            <span>📖</span>
+            <span>אוצר מילים — כרטיסיות לימוד</span>
+          </Link>
+        </div>
+
+        {/* Tips link */}
+        <div className="mt-4 text-center">
+          <Link
+            href="/tips"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-sm transition-all text-sm text-slate-600 hover:text-blue-700"
+          >
+            <span>✨</span>
+            <span>אסטרטגיות לפי סוג שאלה</span>
+          </Link>
         </div>
       </div>
       </div>

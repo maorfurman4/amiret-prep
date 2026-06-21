@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { QuestionCard } from '@/components/exam/QuestionCard';
 import type { Question, QuestionType } from '@/types/exam';
@@ -15,14 +15,27 @@ const TYPE_OPTIONS: { type: QuestionType; label: string; desc: string; icon: str
   { type: 'reading_comprehension', label: 'הבנת הנקרא', desc: 'קרא קטע וענה על שאלות הבנה', icon: '📖' },
 ];
 
-const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; sublabel: string }[] = [
-  { value: 1, label: '1', sublabel: 'קל מאוד' },
-  { value: 2, label: '2', sublabel: 'קל' },
-  { value: 3, label: '3', sublabel: 'בינוני' },
-  { value: 4, label: '4', sublabel: 'קשה' },
-  { value: 5, label: '5', sublabel: 'קשה מאוד' },
-  { value: 'random', label: '🎲', sublabel: 'מעורב' },
+const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; sublabel: string; range: string }[] = [
+  { value: 1, label: '1', sublabel: 'קל מאוד',  range: '50–84'   },
+  { value: 2, label: '2', sublabel: 'קל',         range: '85–99'   },
+  { value: 3, label: '3', sublabel: 'בינוני',     range: '100–119' },
+  { value: 4, label: '4', sublabel: 'קשה',         range: '120–133' },
+  { value: 5, label: '5', sublabel: 'קשה מאוד',  range: '134–150' },
+  { value: 'random', label: '🎲', sublabel: 'מעורב', range: 'מכל הרמות' },
 ];
+
+const EXAM_TIMER_SECONDS: Record<QuestionType, number> = {
+  sentence_completion: 45,
+  restatement: 50,
+  reading_comprehension: 90,
+  esra: 45,
+};
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 export default function PracticePage() {
   const router = useRouter();
@@ -31,6 +44,7 @@ export default function PracticePage() {
   const [selectedType, setType]       = useState<QuestionType | null>(null);
   const [selectedDiff, setDiff]       = useState<Difficulty | null>(null);
   const [selectedCount, setCount]     = useState<5 | 10>(5);
+  const [examMode, setExamMode]       = useState(false);
 
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState<string | null>(null);
@@ -38,6 +52,10 @@ export default function PracticePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers]         = useState<(number | null)[]>([]);
   const [showResult, setShowResult]   = useState(false);
+
+  // Exam mode timer
+  const [timeLeft, setTimeLeft]       = useState<number>(0);
+  const timerRef                      = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchQuestions = async (overrideDiff?: Difficulty) => {
     setLoading(true);
@@ -70,18 +88,23 @@ export default function PracticePage() {
 
   const handleSelect = (optionIndex: number) => {
     if (showResult) return;
+    // In exam mode, only allow one selection per question
+    if (examMode && answers[currentIndex] !== null) return;
     const next = [...answers];
     next[currentIndex] = optionIndex;
     setAnswers(next);
-    setShowResult(true);
-  };
-
-  const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(i => i + 1);
-      setShowResult(false);
-    } else {
-      setStep('done');
+    if (!examMode) {
+      setShowResult(true);
+    }
+    // Track wrong answers for spaced repetition (fire-and-forget)
+    const isWrong = optionIndex !== questions[currentIndex]?.correct_answer;
+    if (isWrong) {
+      const guestId = localStorage.getItem('amiret_guest_id') ?? 'guest';
+      fetch('/api/review-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId, questionId: questions[currentIndex].id, wasCorrect: false }),
+      }).catch(() => {});
     }
   };
 
@@ -93,9 +116,94 @@ export default function PracticePage() {
     setQuestions([]);
     setAnswers([]);
     setError(null);
+    setExamMode(false);
   };
 
   const correctCount = answers.filter((a, i) => a === questions[i]?.correct_answer).length;
+
+  // Keyboard shortcuts: 1-4 = select option, Space/Enter = next question
+  const handleNext = useCallback(() => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(i => i + 1);
+      setShowResult(false);
+    } else {
+      setStep('done');
+    }
+  }, [currentIndex, questions.length]);
+
+  // Exam mode: reset timer when question changes
+  useEffect(() => {
+    if (step !== 'practicing' || !examMode || !selectedType) return;
+
+    // Clear any existing interval
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    const duration = EXAM_TIMER_SECONDS[selectedType];
+    setTimeLeft(duration);
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          timerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, examMode, selectedType, currentIndex]);
+
+  // Auto-advance when timeLeft hits 0 in exam mode
+  useEffect(() => {
+    if (!examMode || step !== 'practicing' || timeLeft !== 0) return;
+    handleNext();
+  }, [timeLeft, examMode, step, handleNext]);
+
+  // Stop timer when leaving practicing step
+  useEffect(() => {
+    if (step !== 'practicing' && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 'practicing') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (examMode) {
+        // In exam mode: number keys select answer
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < (questions[currentIndex]?.options.length ?? 0)) {
+          handleSelect(idx);
+        }
+      } else {
+        if (showResult) {
+          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); handleNext(); }
+        } else {
+          const idx = parseInt(e.key) - 1;
+          if (idx >= 0 && idx < (questions[currentIndex]?.options.length ?? 0)) {
+            handleSelect(idx);
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, showResult, currentIndex, questions, handleNext, examMode]);
+
+  // ── Timer color helper ─────────────────────────────────────────────────────
+  function timerColor(t: number): string {
+    if (t < 10) return 'text-red-600';
+    if (t < 20) return 'text-yellow-500';
+    return 'text-green-600';
+  }
 
   // ── Screens ────────────────────────────────────────────────────────────────
 
@@ -153,7 +261,8 @@ export default function PracticePage() {
                 className="p-4 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all text-center"
               >
                 <div className="text-2xl font-black text-slate-900">{opt.label}</div>
-                <div className="text-xs text-slate-500 mt-1">{opt.sublabel}</div>
+                <div className="text-xs font-semibold text-slate-700 mt-1">{opt.sublabel}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{opt.range}</div>
               </button>
             ))}
           </div>
@@ -190,12 +299,37 @@ export default function PracticePage() {
               </button>
             ))}
           </div>
+
+          {/* Exam mode toggle */}
+          <div className="mt-6 bg-white rounded-2xl border-2 border-slate-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-bold text-slate-900">מצב בחינה</div>
+                <div className="text-xs text-slate-500 mt-0.5">ללא הסברים מיידיים, עם טיימר לכל שאלה</div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={examMode}
+                onClick={() => setExamMode(v => !v)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  examMode ? 'bg-blue-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    examMode ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={() => fetchQuestions()}
             disabled={loading}
             className="mt-8 w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
-            {loading ? 'טוען...' : 'התחל תרגול'}
+            {loading ? 'טוען...' : examMode ? 'התחל בחינה' : 'התחל תרגול'}
           </button>
         </div>
       </div>
@@ -212,24 +346,40 @@ export default function PracticePage() {
         <header className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-bold text-slate-900">
+              <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 {TYPE_OPTIONS.find(t => t.type === selectedType)?.label}
+                {examMode && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                    מצב בחינה
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-500">
                 שאלה {currentIndex + 1} מתוך {questions.length}
               </div>
             </div>
-            <div className="flex gap-1">
-              {questions.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    i < currentIndex
-                      ? answers[i] === questions[i].correct_answer ? 'bg-green-500' : 'bg-red-400'
-                      : i === currentIndex ? 'bg-blue-600' : 'bg-slate-200'
-                  }`}
-                />
-              ))}
+
+            <div className="flex items-center gap-3">
+              {/* Timer (exam mode only) */}
+              {examMode && (
+                <div className={`font-mono text-xl font-black tabular-nums ${timerColor(timeLeft)}`}>
+                  {formatTime(timeLeft)}
+                </div>
+              )}
+
+              {/* Progress dots */}
+              <div className="flex gap-1">
+                {questions.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      i < currentIndex
+                        ? answers[i] === questions[i].correct_answer ? 'bg-green-500' : 'bg-red-400'
+                        : i === currentIndex ? 'bg-blue-600' : 'bg-slate-200'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </header>
@@ -241,17 +391,30 @@ export default function PracticePage() {
             totalInSection={questions.length}
             selectedAnswer={answers[currentIndex] ?? null}
             onSelect={handleSelect}
-            isPractice={true}
-            showResult={showResult}
+            isPractice={!examMode}
+            showResult={examMode ? false : showResult}
           />
 
-          {showResult && (
+          {/* Normal mode: show Next button after answering */}
+          {!examMode && showResult && (
             <div className="mt-6 flex justify-start">
               <button
                 onClick={handleNext}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
               >
                 {isLast ? 'ראה תוצאות ✓' : 'שאלה הבאה ‹'}
+              </button>
+            </div>
+          )}
+
+          {/* Exam mode: show Next button only after answer selected */}
+          {examMode && answers[currentIndex] !== null && (
+            <div className="mt-6 flex justify-start">
+              <button
+                onClick={handleNext}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+              >
+                {isLast ? 'סיים בחינה ✓' : 'שאלה הבאה ‹'}
               </button>
             </div>
           )}
@@ -265,32 +428,100 @@ export default function PracticePage() {
     const color = pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-yellow-600' : 'text-red-600';
 
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4" dir="rtl">
-        <div className="w-full max-w-sm text-center space-y-6">
-          <div className="text-6xl">{pct >= 80 ? '🎉' : pct >= 60 ? '💪' : '📚'}</div>
-          <div>
-            <div className={`text-5xl font-black ${color}`}>{correctCount}/{questions.length}</div>
-            <div className="text-slate-500 mt-1 text-lg">{pct}% נכון</div>
+      <div className="min-h-screen bg-slate-50 px-4 py-8" dir="rtl">
+        <div className="max-w-2xl mx-auto">
+          {/* Score summary */}
+          <div className="text-center space-y-4 mb-10">
+            <div className="text-6xl">{pct >= 80 ? '🎉' : pct >= 60 ? '💪' : '📚'}</div>
+            {examMode && (
+              <div className="inline-block bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full">
+                תוצאת מצב בחינה
+              </div>
+            )}
+            <div>
+              <div className={`text-5xl font-black ${color}`}>{correctCount}/{questions.length}</div>
+              <div className="text-slate-500 mt-1 text-lg">{pct}% נכון</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
+              {pct >= 80 && 'מצוין! אתה שולט בחומר הזה.'}
+              {pct >= 60 && pct < 80 && 'טוב! עוד קצת תרגול ותגיע לשלמות.'}
+              {pct < 60 && 'כדאי לחזור על החומר הזה ולתרגל שוב.'}
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={handleRestart}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+              >
+                תרגול נוסף
+              </button>
+              <button
+                onClick={() => router.push('/exam')}
+                className="w-full py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+              >
+                חזרה לתפריט
+              </button>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
-            {pct >= 80 && 'מצוין! אתה שולט בחומר הזה.'}
-            {pct >= 60 && pct < 80 && 'טוב! עוד קצת תרגול ותגיע לשלמות.'}
-            {pct < 60 && 'כדאי לחזור על החומר הזה ולתרגל שוב.'}
-          </div>
-          <div className="space-y-3">
-            <button
-              onClick={handleRestart}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-            >
-              תרגול נוסף
-            </button>
-            <button
-              onClick={() => router.push('/exam')}
-              className="w-full py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
-            >
-              חזרה לתפריט
-            </button>
-          </div>
+
+          {/* Exam mode: full question review with explanations */}
+          {examMode && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-slate-900 border-b border-slate-200 pb-3">
+                סקירת שאלות והסברים
+              </h2>
+              {questions.map((q, i) => {
+                const isCorrect = answers[i] === q.correct_answer;
+                return (
+                  <div
+                    key={q.id ?? i}
+                    className={`rounded-2xl border-2 overflow-hidden ${
+                      isCorrect ? 'border-green-300' : 'border-red-300'
+                    }`}
+                  >
+                    {/* Status bar */}
+                    <div className={`px-4 py-2 text-sm font-bold flex items-center gap-2 ${
+                      isCorrect
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-red-50 text-red-700'
+                    }`}>
+                      <span>{isCorrect ? '✓' : '✗'}</span>
+                      <span>שאלה {i + 1}</span>
+                      {answers[i] === null && (
+                        <span className="text-slate-500 font-normal">(לא נענתה — פג הזמן)</span>
+                      )}
+                    </div>
+                    <div className="bg-white">
+                      <QuestionCard
+                        question={q}
+                        questionNumber={i + 1}
+                        totalInSection={questions.length}
+                        selectedAnswer={answers[i] ?? null}
+                        onSelect={() => {}}
+                        isPractice={true}
+                        showResult={true}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Bottom action buttons repeated for convenience */}
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={handleRestart}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                >
+                  תרגול נוסף
+                </button>
+                <button
+                  onClick={() => router.push('/exam')}
+                  className="w-full py-3 bg-white border border-slate-300 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                >
+                  חזרה לתפריט
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

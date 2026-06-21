@@ -40,14 +40,20 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
 
   const loadExplanations = async () => {
     setLoadingExplanations(true);
-    const res = await fetch('/api/ai/explanations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    });
-    const data = await res.json() as { explanation: string };
-    setExplanations(data.explanation);
-    setLoadingExplanations(false);
+    try {
+      const res = await fetch('/api/ai/explanations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json() as { explanation: string };
+      setExplanations(data.explanation ?? 'לא ניתן לייצר הסברים כרגע.');
+    } catch {
+      setExplanations('שגיאה בטעינת הסברים. נסה שוב מאוחר יותר.');
+    } finally {
+      setLoadingExplanations(false);
+    }
   };
 
   if (!session) {
@@ -94,6 +100,61 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
             {totalCorrect} / {totalQuestions} תשובות נכונות
           </div>
         </div>
+
+        {/* Score Prediction */}
+        {(() => {
+          const lo = Math.max(50, score - 10);
+          const hi = Math.min(150, score + 10);
+          const pct = ((score - 50) / 100) * 100;
+          const loPct = ((lo - 50) / 100) * 100;
+          const hiPct = ((hi - 50) / 100) * 100;
+          const bands = [
+            { min: 134, max: 150, label: 'פטור מלא — לא נדרש קורס אנגלית', color: 'bg-green-500' },
+            { min: 120, max: 133, label: "מתקדמים ב' — קורס אחד קצר", color: 'bg-blue-500' },
+            { min: 100, max: 119, label: "מתקדמים א' — קורס אחד", color: 'bg-yellow-500' },
+            { min: 85,  max: 99,  label: 'בסיסי — שני קורסים', color: 'bg-orange-500' },
+            { min: 50,  max: 84,  label: 'טרום-בסיסי — שלושה קורסים', color: 'bg-red-500' },
+          ];
+          const currentBand = bands.find(b => score >= b.min && score <= b.max);
+          return (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+              <h2 className="font-bold text-slate-900 mb-1">תחזית ציון AMIRET</h2>
+              <p className="text-slate-500 text-sm mb-4">
+                על בסיס הביצועים שלך, הציון הצפוי הוא בטווח {lo}–{hi}
+              </p>
+              {/* Gradient score bar */}
+              <div className="relative mb-5">
+                <div className="h-5 rounded-full overflow-hidden flex">
+                  <div className="bg-red-400"    style={{ width: '34%' }} />
+                  <div className="bg-orange-400" style={{ width: '15%' }} />
+                  <div className="bg-yellow-400" style={{ width: '19%' }} />
+                  <div className="bg-blue-400"   style={{ width: '13%' }} />
+                  <div className="bg-green-500"  style={{ width: '19%' }} />
+                </div>
+                {/* Range bracket */}
+                <div
+                  className="absolute top-0 h-5 border-2 border-slate-800 rounded bg-white/30"
+                  style={{ left: `${loPct}%`, width: `${Math.max(hiPct - loPct, 2)}%` }}
+                />
+                {/* Current score needle */}
+                <div
+                  className="absolute -top-0.5 w-0.5 h-6 bg-slate-900"
+                  style={{ left: `calc(${pct}% - 1px)` }}
+                />
+                <div className="flex justify-between text-xs text-slate-400 mt-1.5">
+                  <span>50</span>
+                  <span>150</span>
+                </div>
+              </div>
+              {currentBand && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className={`w-3 h-3 rounded-full flex-shrink-0 ${currentBand.color}`} />
+                  <span className="text-sm font-semibold text-slate-800">{currentBand.label}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Score scale */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
