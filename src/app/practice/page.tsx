@@ -255,12 +255,7 @@ export default function PracticePage() {
                 key={String(opt.value)}
                 onClick={() => {
                   setDiff(opt.value);
-                  if (selectedType === 'reading_comprehension') {
-                    // Skip count step — reading_comprehension always returns 5 questions
-                    fetchQuestions(opt.value);
-                  } else {
-                    setStep('pick-count');
-                  }
+                  setStep('pick-count');
                 }}
                 className="p-4 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all text-center"
               >
@@ -450,6 +445,11 @@ export default function PracticePage() {
               {pct >= 80 && 'מצוין! אתה שולט בחומר הזה.'}
               {pct >= 60 && pct < 80 && 'טוב! עוד קצת תרגול ותגיע לשלמות.'}
               {pct < 60 && 'כדאי לחזור על החומר הזה ולתרגל שוב.'}
+              {questions.length - correctCount > 0 && (
+                <div className="mt-2 text-slate-400 text-xs">
+                  {questions.length - correctCount} טעויות מתוך {questions.length} שאלות
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               <button

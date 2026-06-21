@@ -6,7 +6,7 @@ import { QuestionCard } from '@/components/exam/QuestionCard';
 import type { Question } from '@/types/exam';
 import { BackNav } from '@/components/BackNav';
 
-type Step = 'loading' | 'empty' | 'reviewing' | 'done';
+type Step = 'loading' | 'empty' | 'error' | 'reviewing' | 'done';
 
 export default function ReviewQueuePage() {
   const router = useRouter();
@@ -49,15 +49,17 @@ export default function ReviewQueuePage() {
         setStep('reviewing');
       }
     } catch {
-      setStep('empty');
+      setStep('error');
     }
   };
 
-  const handleSelect = (optionIndex: number) => {
+  const handleSelect = useCallback((optionIndex: number) => {
     if (showResult) return;
-    const next = [...answers];
-    next[currentIndex] = optionIndex;
-    setAnswers(next);
+    setAnswers(prev => {
+      const next = [...prev];
+      next[currentIndex] = optionIndex;
+      return next;
+    });
     setShowResult(true);
 
     const wasCorrect = optionIndex === questions[currentIndex].correct_answer;
@@ -73,7 +75,7 @@ export default function ReviewQueuePage() {
         wasCorrect,
       }),
     }).catch(() => {});
-  };
+  }, [showResult, currentIndex, questions, guestId]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < questions.length - 1) {
@@ -109,6 +111,27 @@ export default function ReviewQueuePage() {
     );
   }
 
+  if (step === 'error') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col" dir="rtl">
+        <BackNav backHref="/exam" backLabel="מבחן" />
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+          <div className="w-full max-w-sm text-center space-y-4">
+            <div className="text-5xl">⚠️</div>
+            <h1 className="text-xl font-bold text-slate-900">שגיאה בטעינה</h1>
+            <p className="text-slate-500 text-sm">לא ניתן לטעון את השאלות. בדוק חיבור אינטרנט.</p>
+            <button
+              onClick={() => fetchDueQuestions(guestId)}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+            >
+              נסה שוב
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'empty') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col" dir="rtl">
@@ -131,7 +154,7 @@ export default function ReviewQueuePage() {
   }
 
   if (step === 'done') {
-    const pct = Math.round((correctCount / questions.length) * 100);
+    const pct = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
     const color = pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-yellow-600' : 'text-red-600';
 
     return (

@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
     .eq('difficulty_level', initialDifficulty)
     .limit(section1Cfg.questionCount + 10);
 
-  if (qErr || !qs) {
-    return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
+  if (qErr || !qs || qs.length === 0) {
+    return NextResponse.json({ error: 'No questions available. Please try again later.' }, { status: 503 });
   }
 
   const section1Questions = (qs as Question[])

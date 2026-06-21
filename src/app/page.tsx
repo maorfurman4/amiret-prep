@@ -25,7 +25,7 @@ export default function HomePage() {
           <Link href="/vocabulary" className="flex flex-col items-center gap-2 py-5 bg-white/10 hover:bg-white/20 rounded-2xl text-center transition-colors">
             <span className="text-3xl">📖</span>
             <span className="font-semibold text-sm">אוצר מילים</span>
-            <span className="text-slate-400 text-xs">1,069 מילים</span>
+            <span className="text-slate-400 text-xs">מעל 1,000 מילים</span>
           </Link>
           <Link href="/review-queue" className="flex flex-col items-center gap-2 py-5 bg-white/10 hover:bg-white/20 rounded-2xl text-center transition-colors">
             <span className="text-3xl">🔄</span>

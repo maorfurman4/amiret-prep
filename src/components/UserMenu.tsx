@@ -71,7 +71,7 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1 z-50" dir="rtl">
+        <div className="absolute left-0 mt-2 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1 z-50 min-w-max" dir="rtl" style={{ left: 0, right: 'auto' }}>
           <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
           </div>

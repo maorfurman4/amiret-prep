@@ -32,6 +32,16 @@ export default function ExamModePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const guestId = localStorage.getItem('amiret_guest_id') ?? '';
+    if (!guestId) return;
+    fetch(`/api/review-queue?guestId=${encodeURIComponent(guestId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { count: number } | null) => { if (d?.count) setReviewCount(d.count); })
+      .catch(() => {});
+  }, []);
 
   const getOrCreateGuestId = () => {
     let id = localStorage.getItem('amiret_guest_id');
@@ -51,6 +61,7 @@ export default function ExamModePage() {
     setError(null);
 
     if (mode === 'section') {
+      setLoading(false);
       router.push('/practice');
       return;
     }
@@ -93,7 +104,7 @@ export default function ExamModePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {MODES.map(m => (
             <button
               key={m.mode}
@@ -116,7 +127,12 @@ export default function ExamModePage() {
           >
             <span className="text-3xl">🔁</span>
             <div>
-              <div className="text-lg font-bold text-orange-900 dark:text-orange-200 mb-1">חזרה על טעויות</div>
+              <div className="flex items-center gap-2">
+                <div className="text-lg font-bold text-orange-900 dark:text-orange-200">חזרה על טעויות</div>
+                {reviewCount !== null && (
+                  <span className="px-2 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">{reviewCount}</span>
+                )}
+              </div>
               <div className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">חזור על שאלות שטעית בהן — מערכת חזרה מרווחת</div>
             </div>
           </button>
@@ -137,7 +153,7 @@ export default function ExamModePage() {
         <div className="mt-4 text-center">
           <Link
             href="/tips"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-sm transition-all text-sm text-slate-600 hover:text-blue-700"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-sm transition-all text-sm text-slate-600 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400"
           >
             <span>✨</span>
             <span>אסטרטגיות לפי סוג שאלה</span>

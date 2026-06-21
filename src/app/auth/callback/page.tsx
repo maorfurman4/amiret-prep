@@ -26,10 +26,11 @@ function CallbackHandler() {
       if (session) router.replace(safeNext);
     });
 
-    // Last resort timeout
-    const timer = setTimeout(() => {
-      router.replace(safeNext);
-    }, 5000);
+    // Last resort timeout — only redirect if session exists, otherwise show error
+    const timer = setTimeout(async () => {
+      const { data: { session: fallbackSession } } = await supabase.auth.getSession();
+      router.replace(fallbackSession ? safeNext : '/auth/login');
+    }, 6000);
 
     return () => {
       subscription.unsubscribe();

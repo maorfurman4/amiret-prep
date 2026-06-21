@@ -27,6 +27,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitWarning, setSubmitWarning] = useState<string | null>(null);
 
   // Practice mode: track which question indices have been answered (locked)
   const [lockedAnswers, setLockedAnswers] = useState<Set<number>>(new Set());
@@ -67,6 +68,32 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     if (guestId !== null) loadSession();
   }, [loadSession]);
 
+  const currentSection = session?.current_section_index ?? 1;
+  const currentCfg = SECTION_CONFIGS[currentSection - 1];
+  const currentQuestions = (session?.questions_by_section[currentSection] ?? []) as Question[];
+  const completedSections = session
+    ? Object.keys(session.answers_by_section).map(Number).filter(n => n < currentSection)
+    : [];
+
+  // Keyboard shortcuts: 1-4 select answer, Enter/Space go next question
+  useEffect(() => {
+    if (!session || currentQuestions.length === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = parseInt(e.key) - 1;
+      if (idx >= 0 && idx < currentQuestions[currentQuestionIndex]?.options.length) {
+        handleAnswer(currentQuestionIndex, idx);
+      } else if ((e.key === 'Enter' || e.key === ' ') && answers[currentQuestionIndex] !== null) {
+        e.preventDefault();
+        if (currentQuestionIndex < currentQuestions.length - 1) {
+          setCurrentQuestionIndex(i => i + 1);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [session, currentQuestions, currentQuestionIndex, answers]);
+
   // Warn before leaving mid-exam (non-practice only)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -78,13 +105,6 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [session]);
-
-  const currentSection = session?.current_section_index ?? 1;
-  const currentCfg = SECTION_CONFIGS[currentSection - 1];
-  const currentQuestions = (session?.questions_by_section[currentSection] ?? []) as Question[];
-  const completedSections = session
-    ? Object.keys(session.answers_by_section).map(Number).filter(n => n < currentSection)
-    : [];
 
   const handleAnswer = (questionIndex: number, optionIndex: number) => {
     setAnswers(prev => {
@@ -151,11 +171,16 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
     if (!session) return;
     const unanswered = answers.filter(a => a === null).length;
     if (unanswered > 0 && !session.is_practice) {
-      const confirm = window.confirm(
-        `השארת ${unanswered} שאלות ללא מענה. תשובה ריקה נחשבת שגויה.\nלהמשיך?`
-      );
-      if (!confirm) return;
+      setSubmitWarning(`השארת ${unanswered} שאלות ללא מענה — תשובה ריקה נחשבת שגויה. לחץ שוב לאישור.`);
+      return;
     }
+    setSubmitWarning(null);
+    submitSection(session, answers);
+  };
+
+  const handleConfirmSubmit = () => {
+    if (!session) return;
+    setSubmitWarning(null);
     submitSection(session, answers);
   };
 
@@ -172,7 +197,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
   if (!session || currentQuestions.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50" dir="rtl">
         <div className="text-slate-400 text-lg">טוען מבחן...</div>
       </div>
     );
@@ -220,6 +245,17 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
           isPractice={session.is_practice}
           showResult={session.is_practice && lockedAnswers.has(currentQuestionIndex)}
         />
+
+        {/* Inline submit warning */}
+        {submitWarning && (
+          <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center justify-between gap-3" dir="rtl">
+            <p className="text-orange-800 text-sm">{submitWarning}</p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={() => setSubmitWarning(null)} className="text-xs px-3 py-1.5 rounded-lg border border-orange-300 text-orange-700 hover:bg-orange-100">ביטול</button>
+              <button onClick={handleConfirmSubmit} className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600">אישור</button>
+            </div>
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="mt-8 flex items-center justify-between gap-3">

@@ -105,12 +105,12 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
         {(() => {
           const lo = Math.max(50, score - 10);
           const hi = Math.min(150, score + 10);
-          const pct = ((score - 50) / 100) * 100;
-          const loPct = ((lo - 50) / 100) * 100;
-          const hiPct = ((hi - 50) / 100) * 100;
+          const pct = Math.min(100, Math.max(0, ((score - 50) / 100) * 100));
+          const loPct = Math.min(100, Math.max(0, ((lo - 50) / 100) * 100));
+          const hiPct = Math.min(100, Math.max(0, ((hi - 50) / 100) * 100));
           const bands = [
-            { min: 134, max: 150, label: 'פטור מלא — לא נדרש קורס אנגלית', color: 'bg-green-500' },
-            { min: 120, max: 133, label: "מתקדמים ב' — קורס אחד קצר", color: 'bg-blue-500' },
+            { min: 134, max: 150, label: 'פטור מלא — אין צורך בקורס אנגלית', color: 'bg-green-500' },
+            { min: 120, max: 133, label: "מתקדמים ב' — קורס מקוצר אחד", color: 'bg-blue-500' },
             { min: 100, max: 119, label: "מתקדמים א' — קורס אחד", color: 'bg-yellow-500' },
             { min: 85,  max: 99,  label: 'בסיסי — שני קורסים', color: 'bg-orange-500' },
             { min: 50,  max: 84,  label: 'טרום-בסיסי — שלושה קורסים', color: 'bg-red-500' },
@@ -160,15 +160,14 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
           <h2 className="font-bold text-slate-900 mb-4">סקאלת ציונים</h2>
           {[
-            { range: '134–150', label: 'פטור מלא', color: 'bg-green-500' },
-            { range: '120–133', label: 'מתקדמים ב\'', color: 'bg-blue-500' },
-            { range: '100–119', label: 'מתקדמים א\'', color: 'bg-yellow-500' },
-            { range: '85–99',  label: 'בסיסי', color: 'bg-orange-500' },
-            { range: '50–84',  label: 'טרום-בסיסי', color: 'bg-red-500' },
+            { range: '134–150', label: 'פטור מלא', color: 'bg-green-500', min: 134, max: 150 },
+            { range: '120–133', label: 'מתקדמים ב\'', color: 'bg-blue-500', min: 120, max: 133 },
+            { range: '100–119', label: 'מתקדמים א\'', color: 'bg-yellow-500', min: 100, max: 119 },
+            { range: '85–99',  label: 'בסיסי', color: 'bg-orange-500', min: 85, max: 99 },
+            { range: '50–84',  label: 'טרום-בסיסי', color: 'bg-red-500', min: 50, max: 84 },
           ].map(row => (
             <div key={row.range} className={`flex items-center gap-3 p-3 rounded-xl mb-2 ${
-              score >= parseInt(row.range.split('–')[0]) && score <= parseInt(row.range.split('–')[1] ?? '150')
-                ? 'bg-slate-100 ring-2 ring-blue-400' : ''
+              score >= row.min && score <= row.max ? 'bg-slate-100 ring-2 ring-blue-400' : ''
             }`}>
               <div className={`w-3 h-3 rounded-full ${row.color}`} />
               <span className="font-mono text-sm text-slate-600">{row.range}</span>
@@ -255,7 +254,7 @@ export default function ResultsPage({ params }: { params: Promise<{ sessionId: s
               )}
             </div>
             {explanations ? (
-              <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{explanations}</div>
+              <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">{explanations}</div>
             ) : (
               <div className="text-slate-400 text-sm">לחץ כדי לקבל הסברים מותאמים אישית</div>
             )}

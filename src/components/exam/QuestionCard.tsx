@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Question } from '@/types/exam';
 
 interface ExplanationData {
@@ -42,6 +42,7 @@ export function QuestionCard({
   showResult = false,
 }: QuestionCardProps) {
   const [hintVisible, setHintVisible] = useState(false);
+  useEffect(() => { setHintVisible(false); }, [question.id]);
   const explanation = isPractice && showResult ? parseExplanation(question.explanation) : null;
   const hintStrategy = (question as Question & { hint?: string }).hint
     ?? parseExplanation(question.explanation)?.strategy

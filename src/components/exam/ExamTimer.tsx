@@ -65,7 +65,7 @@ export function ExamTimer({ expiresAt, isPractice, onExpire }: ExamTimerProps) {
     }`}>
       {isWarning && !isExpired && (
         <div className="text-xs font-bold text-red-600 animate-bounce">
-          ⚠ נחש עכשיו! אין עונש על תשובה שגויה
+          ⚠ ענה מהר! הזמן עומד לפוג
         </div>
       )}
       <div className={`text-2xl font-bold tabular-nums ${isWarning ? 'text-red-600' : ''}`}>

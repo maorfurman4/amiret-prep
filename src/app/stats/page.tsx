@@ -225,7 +225,7 @@ export default function StatsPage() {
 
             {/* By question type */}
             <div className="space-y-3 mb-5">
-              {Object.entries(weakness.byType).map(([type, data]) => {
+              {Object.entries(weakness.byType).filter(([, d]) => d.total > 0).map(([type, data]) => {
                 const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
                 const isWeakest = weakestType?.type === type;
                 const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500';
