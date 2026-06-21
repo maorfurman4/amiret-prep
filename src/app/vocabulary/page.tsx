@@ -462,7 +462,8 @@ export default function VocabularyPage() {
       if (removing) {
         supabase.from('user_vocab_favorites').delete().eq('user_id', userId).eq('word_id', id).then();
       } else {
-        supabase.from('user_vocab_favorites').upsert({ user_id: userId, word_id: id }).then();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('user_vocab_favorites') as any).upsert({ user_id: userId, word_id: id }).then();
       }
     }
   };
@@ -485,7 +486,8 @@ export default function VocabularyPage() {
       setDragX(0);
       setAnimating(null);
       if (userId) {
-        supabase.from('user_vocab_known').upsert({ user_id: userId, word_id: wordId }).then();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('user_vocab_known') as any).upsert({ user_id: userId, word_id: wordId }).then();
       }
     }, 280);
   }, [current, known, userId]); // eslint-disable-line react-hooks/exhaustive-deps

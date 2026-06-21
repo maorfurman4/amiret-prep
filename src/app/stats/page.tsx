@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { classifyScore, SECTION_CONFIGS, type SectionResult } from '@/types/exam';
 import { BackNav } from '@/components/BackNav';
@@ -33,13 +34,17 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 export default function StatsPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [weakness, setWeakness] = useState<WeaknessData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user) {
+        router.replace('/auth/login?next=/stats');
+        return;
+      }
 
       // Fetch user_stats and recent exam sessions in parallel
       Promise.all([
@@ -56,7 +61,7 @@ export default function StatsPage() {
           .order('created_at', { ascending: false })
           .limit(10),
       ]).then(([statsRes, sessionsRes]) => {
-        setStats(statsRes.data as Stats);
+        setStats(statsRes.data as unknown as Stats);
 
         // Aggregate weakness data from recent sessions
         if (sessionsRes.data && sessionsRes.data.length > 0) {
@@ -64,7 +69,7 @@ export default function StatsPage() {
           const byDifficulty: Record<string, { correct: number; total: number }> = {};
 
           for (const session of sessionsRes.data) {
-            const sectionResults = (session.section_results ?? []) as SectionResult[];
+            const sectionResults = ((session as unknown as { section_results: unknown }).section_results ?? []) as SectionResult[];
             for (const sr of sectionResults) {
               // Aggregate by question type
               const cfg = SECTION_CONFIGS[sr.sectionIndex - 1];

@@ -15,8 +15,6 @@ function CallbackHandler() {
     const safeNext = next.startsWith('/') ? next : '/';
 
     if (code) {
-      // Exchange code client-side so the browser client has access to
-      // the PKCE verifier it stored in cookies during signInWithOAuth
       supabase.auth.exchangeCodeForSession(code)
         .then(() => router.replace(safeNext))
         .catch(() => router.replace('/auth/login?error=callback'));
