@@ -166,11 +166,11 @@ export default function StatsPage() {
         )}
 
         {/* Score history */}
-        {stats.score_history.length > 0 && (
+        {(stats.score_history ?? []).length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
             <h2 className="font-bold text-slate-900 mb-4">היסטוריית ציונים</h2>
             <div className="flex items-end gap-2 h-24">
-              {stats.score_history.slice(-20).map((entry, i) => {
+              {(stats.score_history ?? []).slice(-20).map((entry, i) => {
                 const height = Math.max(8, ((entry.score - 50) / 100) * 100);
                 const cls = classifyScore(entry.score);
                 return (
@@ -192,11 +192,11 @@ export default function StatsPage() {
         )}
 
         {/* Performance by type */}
-        {Object.keys(stats.performance_by_type).length > 0 && (
+        {Object.keys(stats.performance_by_type ?? {}).length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
             <h2 className="font-bold text-slate-900 mb-4">ביצועים לפי סוג שאלה</h2>
             <div className="space-y-3">
-              {Object.entries(stats.performance_by_type).filter(([, d]) => d.total > 0).map(([type, data]) => {
+              {Object.entries(stats.performance_by_type ?? {}).filter(([, d]) => d.total > 0).map(([type, data]) => {
                 const pct = Math.round((data.correct / data.total) * 100);
                 return (
                   <div key={type}>

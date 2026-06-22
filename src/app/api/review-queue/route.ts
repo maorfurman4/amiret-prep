@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 import type { Question } from '@/types/exam';
 
 function nextInterval(currentDays: number): number {
-  const doubled = currentDays * 2;
+  const doubled = Math.max(currentDays, 1) * 2;
   return Math.min(doubled, 30);
 }
 
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
   const { interval_days, times_wrong } = existing as { interval_days: number; times_wrong: number };
   const newInterval = nextInterval(interval_days);
 
-  if (newInterval >= 30 && times_wrong < 3) {
+  if (newInterval >= 30) {
     await supabase.from('review_queue').delete().eq(ownCol, ownVal).eq('question_id', questionId);
     return NextResponse.json({ ok: true, action: 'graduated' });
   }

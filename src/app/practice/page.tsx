@@ -97,16 +97,14 @@ export default function PracticePage() {
     if (!examMode) {
       setShowResult(true);
     }
-    // Track wrong answers for spaced repetition (fire-and-forget)
-    const isWrong = optionIndex !== questions[currentIndex]?.correct_answer;
-    if (isWrong) {
-      const guestId = localStorage.getItem('amiret_guest_id') ?? 'guest';
-      fetch('/api/review-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestId, questionId: questions[currentIndex].id, wasCorrect: false }),
-      }).catch(() => {});
-    }
+    // Track answers for spaced repetition (fire-and-forget)
+    const isCorrect = optionIndex === questions[currentIndex]?.correct_answer;
+    const guestId = localStorage.getItem('amiret_guest_id') ?? 'guest';
+    fetch('/api/review-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId, questionId: questions[currentIndex].id, wasCorrect: isCorrect }),
+    }).catch(() => {});
   };
 
   const handleRestart = () => {

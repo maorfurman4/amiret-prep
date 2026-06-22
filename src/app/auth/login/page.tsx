@@ -11,7 +11,8 @@ function LoginForm() {
   const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/';
+  const rawNext = params.get('next') ?? '/';
+  const next = rawNext.startsWith('/') ? rawNext : '/';
 
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
