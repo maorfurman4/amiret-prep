@@ -10,6 +10,13 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
 export const metadata: Metadata = {
   title: 'הכנה לאמירנ"ט',
   description: 'פלטפורמת הכנה אדפטיבית למבחן אמירנ"ט — אלגוריתם IRT 3PL מדויק',
+  icons: {
+    icon: [
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
