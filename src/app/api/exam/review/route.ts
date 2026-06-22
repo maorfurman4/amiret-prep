@@ -17,13 +17,17 @@ export async function GET(req: NextRequest) {
 
   const query = supabase
     .from('exam_sessions')
-    .select('questions_by_section, answers_by_section, section_results, is_practice')
+    .select('questions_by_section, answers_by_section, section_results, is_practice, completed_at')
     .eq('id', sessionId);
   if (sessionOwner) query.eq('user_id', sessionOwner);
   const { data: session, error } = await query.single();
 
   if (error || !session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+  }
+
+  if (!session.completed_at && !session.is_practice) {
+    return NextResponse.json({ error: 'Exam not complete' }, { status: 403 });
   }
 
   const questionsBySection = session.questions_by_section as Record<number, Question[]>;

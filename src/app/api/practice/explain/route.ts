@@ -12,34 +12,58 @@ export interface ExplanationData {
 }
 
 export async function POST(req: NextRequest) {
-  const { questionId, questionText, options, correctAnswer, questionType, passageText } =
-    await req.json() as {
-      questionId: string;
-      questionText: string;
-      options: { id?: string; text: string }[];
-      correctAnswer: number;
-      questionType: QuestionType;
-      passageText?: string;
-    };
+  let body: { questionId?: unknown };
+  try {
+    body = await req.json() as { questionId?: unknown };
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const { questionId } = body;
+  if (typeof questionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(questionId)) {
+    return NextResponse.json({ error: 'Invalid questionId' }, { status: 400 });
+  }
 
   const supabase = await createServerSupabaseClient();
 
-  // Return cached rich explanation if available
-  const { data: existing } = await supabase
+  // Fetch the question from DB — use only DB-sourced data, never client-supplied text
+  const { data: dbQuestion } = await supabase
     .from('questions')
-    .select('explanation')
+    .select('text, options, correct_answer, type, explanation, passage_id')
     .eq('id', questionId)
     .single();
 
-  if (existing?.explanation) {
+  if (!dbQuestion) {
+    return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+  }
+
+  // Return cached rich explanation if available
+  if (dbQuestion.explanation) {
     try {
-      const parsed = JSON.parse(existing.explanation) as ExplanationData;
+      const parsed = JSON.parse(dbQuestion.explanation) as ExplanationData;
       if (parsed.correct_reason && parsed.options_analysis) {
         return NextResponse.json(parsed);
       }
     } catch {
       // Not JSON — will regenerate
     }
+  }
+
+  // Use only DB-sourced values for the prompt
+  const questionText = dbQuestion.text as string;
+  const options = dbQuestion.options as { text: string }[];
+  const correctAnswer = dbQuestion.correct_answer as number;
+  const questionType = dbQuestion.type as QuestionType;
+
+  // Fetch passage text from DB if needed
+  let passageText: string | undefined;
+  if (dbQuestion.passage_id) {
+    const { data: passage } = await supabase
+      .from('passages')
+      .select('text')
+      .eq('id', dbQuestion.passage_id)
+      .single();
+    passageText = passage?.text as string | undefined;
   }
 
   const typeLabel: Record<string, string> = {

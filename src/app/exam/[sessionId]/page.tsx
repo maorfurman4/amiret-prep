@@ -36,7 +36,7 @@ export default function ExamPage({ params }: { params: Promise<{ sessionId: stri
 
   // Read guestId after hydration — avoids SSR/client mismatch
   useEffect(() => {
-    setGuestId(localStorage.getItem('amiret_guest_id') ?? '');
+    setGuestId(localStorage.getItem('amiret_guest_id') ?? null);
   }, []);
 
   // Load or recover session state from server

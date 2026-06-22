@@ -33,8 +33,19 @@ export async function GET(req: NextRequest) {
     timerExpired = remainingMs === 0;
   }
 
+  // Strip correct_answer from all questions before sending to client
+  // to prevent cheating during active exam
+  const safeSession = {
+    ...session,
+    questions_by_section: Object.fromEntries(
+      Object.entries((session.questions_by_section as Record<string, unknown[]>) ?? {}).map(
+        ([k, qs]) => [k, (qs as Record<string, unknown>[]).map(({ correct_answer: _ca, ...rest }) => rest)]
+      )
+    ),
+  };
+
   return NextResponse.json({
-    session,
+    session: safeSession,
     remainingMs,
     timerExpired,
     serverNow: now,

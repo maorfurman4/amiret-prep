@@ -117,6 +117,7 @@ export function estimateThetaEAP(items: IrtParams[], responses: number[]): numbe
  * Targets P=0.5 — the most informative operating point.
  */
 export function routeNextDifficulty(theta: number): DifficultyLevel {
+  if (!isFinite(theta)) return 3;
   if (theta >= 1.5)  return 5;
   if (theta >= 0.5)  return 4;
   if (theta >= -0.5) return 3;
@@ -131,6 +132,7 @@ export function routeNextDifficulty(theta: number): DifficultyLevel {
  * Score = θ * 20 + 100  (clamped to [50, 150])
  */
 export function thetaToScore(theta: number): number {
+  if (!isFinite(theta)) return 100;
   const raw = theta * 20 + 100;
   return Math.max(50, Math.min(150, Math.round(raw)));
 }

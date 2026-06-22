@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type Question, type SectionResult } from '@/types/exam';
 import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCount } from '@/lib/adaptive';
+import {
+  fetchUnseenQuestions,
+  recordSeenQuestions,
+  fetchUnseenRCQuestions,
+  recordSeenPassage,
+} from '@/lib/question-history';
 
 /**
  * POST /api/exam/answer
@@ -10,40 +16,57 @@ import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCoun
  *  2. Derives the difficulty level for the NEXT section from the new θ.
  *  3. Fetches ONLY the next section's questions from DB at that difficulty.
  * No section is ever pre-fetched — every section is determined adaptively.
+ *
+ * Uses user_question_history / user_passage_history for cross-session deduplication.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient();
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const body = await req.json() as {
-    sessionId: string;
-    sectionIndex: number;
-    answers: (number | null)[];
-    guestId?: string;
-  };
+  let body: { sessionId: string; sectionIndex: number; answers: (number | null)[]; guestId?: string };
+  try {
+    body = await req.json() as typeof body;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
-  const sessionOwner = user?.id ?? body.guestId;
+  const userKey = user?.id ?? body.guestId ?? null;
 
   const query = supabase.from('exam_sessions').select('*').eq('id', body.sessionId);
-  if (sessionOwner) query.eq('user_id', sessionOwner);
+  if (userKey) query.eq('user_id', userKey);
   const { data: session, error: fetchErr } = await query.single();
 
   if (fetchErr || !session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
-  if (session.current_section_index !== body.sectionIndex) {
+  if (session.completed_at) {
+    return NextResponse.json({ error: 'Session already completed' }, { status: 409 });
+  }
+
+  const sectionIndex = body.sectionIndex;
+  if (!Number.isInteger(sectionIndex) || sectionIndex < 1 || sectionIndex > SECTION_CONFIGS.length) {
+    return NextResponse.json({ error: 'Invalid sectionIndex' }, { status: 400 });
+  }
+
+  if (session.current_section_index !== sectionIndex) {
     return NextResponse.json({ error: 'Section mismatch' }, { status: 400 });
   }
 
   const questionsBySection = session.questions_by_section as Record<number, Question[]>;
   const currentQuestions = questionsBySection[body.sectionIndex] ?? [];
+
+  // Validate answers: must be same length as questions, each null or 0-3
+  if (!Array.isArray(body.answers) || body.answers.length !== currentQuestions.length) {
+    return NextResponse.json({ error: 'Invalid answers length' }, { status: 400 });
+  }
+  if (!body.answers.every(a => a === null || (Number.isInteger(a) && a >= 0 && a <= 3))) {
+    return NextResponse.json({ error: 'Invalid answer value' }, { status: 400 });
+  }
   const cfg = SECTION_CONFIGS[body.sectionIndex - 1];
 
   // ── Step 1: Update θ via MLE/EAP (cumulative — all sections, not just current) ─
-  // Using only 3–5 items per section makes MLE extremely noisy; one bad RC section
-  // can swing θ by ±2. Accumulating all responses gives a stable, accurate estimate.
   const previousResults = (session.section_results as SectionResult[]);
   const allQuestions: Question[] = [
     ...previousResults.flatMap(sr => sr.questions as Question[]),
@@ -95,54 +118,55 @@ export async function POST(req: NextRequest) {
     const nextDifficulty = routeNextDifficulty(newTheta);
     const nextCfg = SECTION_CONFIGS[nextSectionIndex - 1];
 
-    // ── Step 3: Fetch ONLY next section from DB at the adaptive difficulty ─────
-    let nextQuestions: Question[] = [];
-
+    // in-session tracking (kept for within-session RC passage deduplication)
     const usedQIds: string[] = (session.used_question_ids as string[] | null) ?? [];
     const usedPIds: string[] = (session.used_passage_ids as string[] | null) ?? [];
 
+    // ── Step 3: Fetch ONLY next section from DB at the adaptive difficulty ─────
+    let nextQuestions: Question[] = [];
+
     if (nextCfg.type === 'reading_comprehension') {
-      let passagesQuery = supabase
-        .from('passages')
-        .select('id, text, difficulty_level, b')
-        .eq('difficulty_level', nextDifficulty)
-        .limit(20);
-      if (usedPIds.length > 0) {
-        passagesQuery = passagesQuery.not('id', 'in', `(${usedPIds.join(',')})`);
-      }
-      const { data: passages } = await passagesQuery;
+      nextQuestions = await fetchUnseenRCQuestions({
+        supabase,
+        userKey,
+        difficultyLevel: nextDifficulty,
+        usedPIds,
+      });
 
-      const passage = passages?.[Math.floor(Math.random() * (passages?.length ?? 1))];
-      if (passage) {
-        const { data: qs } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('type', 'reading_comprehension')
-          .eq('passage_id', passage.id)
-          .limit(5);
-
-        nextQuestions = (qs ?? []).map(q => ({
-          ...q,
-          passage: { id: passage.id, text: passage.text, difficulty_level: passage.difficulty_level, b: passage.b },
-        })) as Question[];
-
-        updatePayload.used_passage_ids = [...usedPIds, passage.id];
+      if (nextQuestions.length > 0) {
+        const passageId = nextQuestions[0].passage_id!;
+        updatePayload.used_passage_ids = [...usedPIds, passageId];
+        if (userKey) {
+          await recordSeenPassage(supabase, userKey, passageId);
+        }
       }
     } else {
-      let qQuery = supabase
-        .from('questions')
-        .select('*')
-        .eq('type', nextCfg.type)
-        .eq('difficulty_level', nextDifficulty)
-        .limit(nextCfg.questionCount + 10);
-      if (usedQIds.length > 0) {
-        qQuery = qQuery.not('id', 'in', `(${usedQIds.join(',')})`);
+      if (userKey) {
+        // Cross-session deduplication
+        nextQuestions = await fetchUnseenQuestions({
+          supabase,
+          userKey,
+          type: nextCfg.type,
+          difficultyLevel: nextDifficulty,
+          needed: nextCfg.questionCount,
+        });
+        await recordSeenQuestions(supabase, userKey, nextQuestions.map(q => q.id));
+      } else {
+        // No user_key — fall back to in-session deduplication only
+        let qQuery = supabase
+          .from('questions')
+          .select('*')
+          .eq('type', nextCfg.type)
+          .eq('difficulty_level', nextDifficulty)
+          .limit(nextCfg.questionCount + 10);
+        if (usedQIds.length > 0) {
+          qQuery = qQuery.not('id', 'in', `(${usedQIds.join(',')})`);
+        }
+        const { data: qs } = await qQuery;
+        nextQuestions = ((qs ?? []) as Question[])
+          .sort(() => Math.random() - 0.5)
+          .slice(0, nextCfg.questionCount);
       }
-      const { data: qs } = await qQuery;
-
-      nextQuestions = (qs ?? [])
-        .sort(() => Math.random() - 0.5)
-        .slice(0, nextCfg.questionCount) as Question[];
     }
 
     const newQIds = nextQuestions.map(q => q.id);

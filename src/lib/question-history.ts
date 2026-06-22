@@ -30,20 +30,22 @@ export async function fetchUnseenQuestions({
   difficultyLevel: number;
   needed: number;
 }): Promise<Question[]> {
-  // Get IDs already seen by this user for this question type
-  const { data: allQsOfType } = await supabase
+  // Get IDs already seen by this user for this type+difficulty combination only
+  // (scoped to difficulty so reset doesn't wipe other difficulty levels)
+  const { data: allQsOfTypeDiff } = await supabase
     .from('questions')
     .select('id')
-    .eq('type', type);
-  const typeIds = (allQsOfType ?? []).map((r: { id: string }) => r.id);
+    .eq('type', type)
+    .eq('difficulty_level', difficultyLevel);
+  const typeDiffIds = (allQsOfTypeDiff ?? []).map((r: { id: string }) => r.id);
 
   let seenIds: string[] = [];
-  if (typeIds.length > 0) {
+  if (typeDiffIds.length > 0) {
     const { data: seenRows } = await supabase
       .from('user_question_history')
       .select('question_id')
       .eq('user_key', userKey)
-      .in('question_id', typeIds);
+      .in('question_id', typeDiffIds);
     seenIds = (seenRows ?? []).map((r: { question_id: string }) => r.question_id);
   }
 
@@ -54,13 +56,13 @@ export async function fetchUnseenQuestions({
     return questions.slice(0, needed);
   }
 
-  // Not enough unseen → reset history for this type and fetch from full pool
+  // Not enough unseen → reset history for this type+difficulty only (not cross-difficulty)
   if (seenIds.length > 0) {
     await supabase
       .from('user_question_history')
       .delete()
       .eq('user_key', userKey)
-      .in('question_id', typeIds);
+      .in('question_id', typeDiffIds);
   }
 
   questions = await queryQuestions(supabase, type, difficultyLevel, needed, []);
