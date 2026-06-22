@@ -8,6 +8,8 @@ const TABS = [
   { href: '/exam',        icon: '🎯', label: 'מבחן'      },
   { href: '/practice',    icon: '✏️', label: 'תרגול'    },
   { href: '/review-queue',icon: '🔄', label: 'חזרה'      },
+  { href: '/vocabulary',  icon: '📖', label: 'אוצר מילים' },
+  { href: '/strategies',  icon: '🧠', label: 'אסטרטגיות' },
   { href: '/stats',       icon: '📊', label: 'סטטיסטיקה' },
 ];
 
