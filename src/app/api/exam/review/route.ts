@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type Question, type SectionResult } from '@/types/exam';
 
 export async function GET(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
 
   const url = new URL(req.url);
   const sessionId = url.searchParams.get('sessionId');

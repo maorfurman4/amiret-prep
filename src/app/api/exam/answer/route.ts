@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type Question, type SectionResult } from '@/types/exam';
 import { updateThetaAfterSection, routeNextDifficulty, thetaToScore, correctCount } from '@/lib/adaptive';
 import {
@@ -20,9 +20,8 @@ import {
  * Uses user_question_history / user_passage_history for cross-session deduplication.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
 
   let body: { sessionId: string; sectionIndex: number; answers: (number | null)[]; guestId?: string };
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import type { Question, QuestionType, DifficultyLevel } from '@/types/exam';
 
 /**
@@ -13,7 +13,7 @@ import type { Question, QuestionType, DifficultyLevel } from '@/types/exam';
  *   count    — 5 | 10 (ignored for reading_comprehension, always returns 5)
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
+  const { supabase } = await getServerClients();
 
   const { searchParams } = req.nextUrl;
   const type = searchParams.get('type') as QuestionType | null;

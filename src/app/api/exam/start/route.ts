@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import { SECTION_CONFIGS, type ExamMode, type Question } from '@/types/exam';
 import { routeNextDifficulty } from '@/lib/adaptive';
 import { fetchUnseenQuestions, recordSeenQuestions } from '@/lib/question-history';
@@ -13,9 +13,8 @@ import { fetchUnseenQuestions, recordSeenQuestions } from '@/lib/question-histor
  * see the same question twice until the full pool is exhausted (then resets).
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
   let body: { mode?: ExamMode; isPractice?: boolean; guestId?: string };
   try {
     body = await req.json() as { mode?: ExamMode; isPractice?: boolean; guestId?: string };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import type { Question } from '@/types/exam';
 
 function nextInterval(currentDays: number): number {
@@ -12,8 +12,8 @@ function nextInterval(currentDays: number): number {
  * Returns due questions (next_review_at <= now()) with full question data.
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
   const guestId = req.nextUrl.searchParams.get('guestId');
 
   if (!user && !guestId) {
@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
  * - Correct in review: double interval or remove if graduated
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
 
   let body: { guestId?: string; questionId: string; wasCorrect: boolean };
   try {

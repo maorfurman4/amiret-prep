@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { getServerClients } from '@/lib/supabase-server';
 import OpenAI from 'openai';
 import type { QuestionType } from '@/types/exam';
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid questionId' }, { status: 400 });
   }
 
-  const supabase = await createServerSupabaseClient();
+  const { supabase } = await getServerClients();
 
   // Fetch the question from DB — use only DB-sourced data, never client-supplied text
   const { data: dbQuestion } = await supabase

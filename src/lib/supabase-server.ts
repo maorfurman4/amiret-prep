@@ -1,6 +1,19 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+/**
+ * Returns both an auth client (reads user session from cookies)
+ * and an admin client (service role, bypasses RLS — safe to use only in server routes).
+ * Pattern: use authClient only for getUser(), use supabase (admin) for all DB queries.
+ */
+export async function getServerClients() {
+  const [authClient, adminClient] = await Promise.all([
+    createServerSupabaseClient(),
+    createAdminSupabaseClient(),
+  ]);
+  return { authClient, supabase: adminClient };
+}
+
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
   return createServerClient(
