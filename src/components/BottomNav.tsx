@@ -42,17 +42,17 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`relative flex-1 flex flex-col items-center pt-2 pb-1 gap-0.5 transition-colors ${
+              className={`relative flex-1 flex flex-col items-center pt-2.5 pb-2 gap-1 transition-colors ${
                 active
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-slate-500 dark:text-slate-400 active:text-slate-900 dark:active:text-white'
               }`}
             >
               {active && (
-                <span className="absolute top-0 inset-x-2 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-b-full" />
+                <span className="absolute top-0 inset-x-1 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-b-full" />
               )}
-              <span className="text-xl leading-none">{tab.icon}</span>
-              <span className={`text-[10px] leading-tight ${active ? 'font-bold' : 'font-medium'}`}>
+              <span className="text-2xl leading-none">{tab.icon}</span>
+              <span className={`text-[11px] leading-tight ${active ? 'font-bold' : 'font-medium'}`}>
                 {tab.label}
               </span>
             </Link>

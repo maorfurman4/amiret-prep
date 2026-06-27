@@ -7,11 +7,14 @@ import { cookies } from 'next/headers';
  * Pattern: use authClient only for getUser(), use supabase (admin) for all DB queries.
  */
 export async function getServerClients() {
-  const [authClient, adminClient] = await Promise.all([
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+  const hasServiceKey = serviceKey.length > 0 && !serviceKey.includes('placeholder');
+
+  const [authClient, dbClient] = await Promise.all([
     createServerSupabaseClient(),
-    createAdminSupabaseClient(),
+    hasServiceKey ? createAdminSupabaseClient() : createServerSupabaseClient(),
   ]);
-  return { authClient, supabase: adminClient };
+  return { authClient, supabase: dbClient };
 }
 
 export async function createServerSupabaseClient() {

@@ -33,10 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-900 pb-16 md:pb-0">
         <div className="fixed top-3 left-3 z-50 flex items-center gap-2">
           <UserMenu />
+          <ThemeToggle />
         </div>
         {children}
         <BottomNav />
-        <ThemeToggle />
       </body>
     </html>
   );

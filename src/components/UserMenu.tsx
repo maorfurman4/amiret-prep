@@ -14,9 +14,8 @@ export function UserMenu() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // getSession reads from localStorage immediately — no network call needed
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
-
+    // onAuthStateChange fires INITIAL_SESSION on mount with the persisted session
+    // This covers both cold load and post-OAuth redirect without a separate getSession() race
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
