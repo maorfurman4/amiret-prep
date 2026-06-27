@@ -179,6 +179,7 @@ export default function VocabularyPage() {
   const [timedWordCount, setTimedWordCount] = useState<5 | 10 | 20>(10);
   const [timedTimePerWord, setTimedTimePerWord] = useState<10 | 15 | 20 | 30>(20);
   const [showTimedConfig, setShowTimedConfig] = useState(false);
+  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   // ─── Load auth user ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -682,69 +683,124 @@ export default function VocabularyPage() {
           ))}
         </div>
 
-        {/* ── Active pack banner ────────────────────────────────────────────── */}
-        {activePack && (
-          <div className="flex items-center justify-between mb-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
-            <span className="text-sm font-medium text-blue-800">
-              {THEMED_PACKS.find(p => p.id === activePack)?.label ?? activePack} — פעיל
-            </span>
-            <button
-              onClick={() => setActivePack('')}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-            >
-              × חזור לכל המילים
-            </button>
+        {/* ── Filter button + active chips ──────────────────────────────────── */}
+        {(() => {
+          const hasActive = !!(activePack || filterCat || filterDiff || search);
+          const activeCount = [activePack, filterCat, filterDiff > 0, search.trim()].filter(Boolean).length;
+          return (
+            <div className="mb-5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowFilterDrawer(true)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${hasActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
+                >
+                  🔍 סינון{activeCount > 0 ? ` (${activeCount})` : ''}
+                </button>
+                {activePack && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                    {THEMED_PACKS.find(p => p.id === activePack)?.label}
+                    <button onClick={() => setActivePack('')} className="hover:text-blue-900 font-bold leading-none">×</button>
+                  </span>
+                )}
+                {filterCat && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-medium">
+                    {CATEGORY_LABELS[filterCat] ?? filterCat}
+                    <button onClick={() => setFilterCat('')} className="hover:text-slate-900 font-bold leading-none">×</button>
+                  </span>
+                )}
+                {filterDiff > 0 && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                    {'★'.repeat(filterDiff)}
+                    <button onClick={() => setFilterDiff(0)} className="hover:text-amber-900 font-bold leading-none">×</button>
+                  </span>
+                )}
+                {search.trim() && (
+                  <span className="flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium max-w-[140px]">
+                    <span className="truncate">&ldquo;{search}&rdquo;</span>
+                    <button onClick={() => setSearch('')} className="hover:text-green-900 font-bold leading-none flex-shrink-0">×</button>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-2 pr-1">{filteredWords.length} מילים</p>
+            </div>
+          );
+        })()}
+
+        {/* ── Filter drawer ─────────────────────────────────────────────────── */}
+        {showFilterDrawer && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowFilterDrawer(false)}>
+            <div className="bg-white dark:bg-slate-800 rounded-t-3xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+                <span className="font-bold text-slate-900 dark:text-white text-lg">סינון מילים</span>
+                <div className="flex items-center gap-4">
+                  {!!(activePack || filterCat || filterDiff || search) && (
+                    <button
+                      onClick={() => { setActivePack(''); setFilterCat(''); setFilterDiff(0); setSearch(''); }}
+                      className="text-sm text-red-500 font-semibold"
+                    >נקה הכל</button>
+                  )}
+                  <button onClick={() => setShowFilterDrawer(false)} className="text-2xl text-slate-400 leading-none hover:text-slate-600">×</button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto px-5 py-5 space-y-6">
+                {/* Themed packs */}
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">סטים נושאיים</div>
+                  <div className="flex flex-wrap gap-2">
+                    {THEMED_PACKS.map(pack => (
+                      <button
+                        key={pack.id}
+                        onClick={() => setActivePack(activePack === pack.id ? '' : pack.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${activePack === pack.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-blue-300'}`}
+                      >{pack.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">קטגוריה</div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setFilterCat('')} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${!filterCat ? 'bg-slate-800 text-white border-slate-800' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-slate-400'}`}>הכל</button>
+                    {categories.map(cat => (
+                      <button key={cat} onClick={() => setFilterCat(cat === filterCat ? '' : cat)} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${filterCat === cat ? 'bg-slate-800 text-white border-slate-800' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-slate-400'}`}>{CATEGORY_LABELS[cat] ?? cat}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Difficulty */}
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">רמה</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {[0, 1, 2, 3, 4, 5].map(d => (
+                      <button key={d} onClick={() => setFilterDiff(d === filterDiff ? 0 : d)} className={`w-10 h-10 rounded-xl text-xs font-bold border transition-colors ${filterDiff === d && d !== 0 ? 'bg-slate-800 text-white border-slate-800' : d === 0 ? 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-600 text-[10px]' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-slate-400'}`}>{d === 0 ? 'הכל' : '★'.repeat(d)}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search */}
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">חיפוש</div>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="חיפוש מילה בעברית / אנגלית..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm focus:outline-none focus:border-blue-400 text-right dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700">
+                <button
+                  onClick={() => setShowFilterDrawer(false)}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
+                >הצג {filteredWords.length} מילים</button>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* ── Themed Packs ──────────────────────────────────────────────────── */}
-        <div className="mb-4">
-          <div className="text-xs font-semibold text-slate-400 mb-2 px-1">סטים נושאיים</div>
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar" style={{ direction: 'ltr' }}>
-            {THEMED_PACKS.map(pack => (
-              <button
-                key={pack.id}
-                onClick={() => setActivePack(activePack === pack.id ? '' : pack.id)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap ${activePack === pack.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
-                style={{ direction: 'rtl' }}
-              >{pack.label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Filters ───────────────────────────────────────────────────────── */}
-        <div className="space-y-3 mb-6">
-          <div className="flex flex-wrap gap-2 justify-center">
-            <button
-              onClick={() => setFilterCat('')}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filterCat === '' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
-            >הכל</button>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setFilterCat(cat === filterCat ? '' : cat)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filterCat === cat ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
-              >{CATEGORY_LABELS[cat] ?? cat}</button>
-            ))}
-          </div>
-          <div className="flex gap-2 justify-center">
-            <span className="text-xs text-slate-500 self-center">רמה:</span>
-            {[0, 1, 2, 3, 4, 5].map(d => (
-              <button
-                key={d}
-                onClick={() => setFilterDiff(d === filterDiff ? 0 : d)}
-                className={`w-8 h-8 rounded-lg text-xs font-bold border transition-colors ${filterDiff === d && d !== 0 ? 'bg-slate-800 text-white border-slate-800' : d === 0 ? 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 text-[10px]' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
-              >{d === 0 ? 'הכל' : '★'.repeat(d)}</button>
-            ))}
-          </div>
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="חיפוש מילה בעברית / אנגלית..."
-            className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-blue-400 text-right"
-          />
-        </div>
 
         {/* ════════════════════════════════════════════════════════════════════
             FLASHCARD MODE
@@ -771,11 +827,11 @@ export default function VocabularyPage() {
 
             {current ? (
               <div className="relative select-none">
-                {deck[2] && <div className="absolute inset-0 bg-white rounded-3xl border border-slate-100 shadow-sm" style={{ transform: 'scale(0.92) translateY(16px)', zIndex: 0 }} />}
-                {deck[1] && <div className="absolute inset-0 bg-white rounded-3xl border border-slate-100 shadow-sm" style={{ transform: 'scale(0.96) translateY(8px)', zIndex: 1 }} />}
+                {deck[2] && <div className="absolute inset-0 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm" style={{ transform: 'scale(0.92) translateY(18px)', zIndex: 0 }} />}
+                {deck[1] && <div className="absolute inset-0 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm" style={{ transform: 'scale(0.96) translateY(9px)', zIndex: 1 }} />}
 
                 <div
-                  className="relative bg-white rounded-3xl border border-slate-200 shadow-md p-8 cursor-grab active:cursor-grabbing"
+                  className="relative bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-lg p-8 min-h-[320px] flex flex-col justify-center cursor-grab active:cursor-grabbing"
                   style={{
                     zIndex: 2,
                     transform: `translateX(${tx}px) rotate(${rotate}deg)`,
@@ -807,7 +863,7 @@ export default function VocabularyPage() {
                         {CATEGORY_LABELS[current.category] ?? current.category}
                       </div>
                       <div className="flex items-center justify-center gap-3 mb-2">
-                        <div className="text-4xl font-black text-slate-900 leading-tight">{current.word}</div>
+                        <div className="text-5xl font-black text-slate-900 dark:text-white leading-tight">{current.word}</div>
                         <button
                           onClick={e => { e.stopPropagation(); speak(current.word); }}
                           className="text-2xl hover:scale-110 transition-transform"
