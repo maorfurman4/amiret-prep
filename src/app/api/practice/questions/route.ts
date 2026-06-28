@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerClients } from '@/lib/supabase-server';
 import type { Question, QuestionType, DifficultyLevel } from '@/types/exam';
 
+function fisherYates<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 /**
  * GET /api/practice/questions
  * Returns a set of questions for focused section practice.
@@ -32,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   if (type === 'reading_comprehension') {
     // For random: pick a random passage from any difficulty level
-    let passageQuery = supabase.from('passages').select('id, text, difficulty_level, b').limit(20);
+    let passageQuery = supabase.from('passages').select('id, text, difficulty_level, b').limit(100);
     if (diffParam !== 'random') passageQuery = passageQuery.eq('difficulty_level', difficulty);
 
     const { data: passages } = await passageQuery;
@@ -72,7 +81,7 @@ export async function GET(req: NextRequest) {
     if (!pool.length) {
       return NextResponse.json({ error: 'No questions found' }, { status: 404 });
     }
-    const questions = pool.sort(() => Math.random() - 0.5).slice(0, count);
+    const questions = fisherYates(pool).slice(0, count);
     return NextResponse.json({ questions, difficulty: 'random' });
   }
 
@@ -87,9 +96,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No questions found for this difficulty' }, { status: 404 });
   }
 
-  const questions = (qs as Question[])
-    .sort(() => Math.random() - 0.5)
-    .slice(0, count);
+  const questions = fisherYates(qs as Question[]).slice(0, count);
 
   return NextResponse.json({ questions, difficulty });
 }
