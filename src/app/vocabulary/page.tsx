@@ -300,8 +300,9 @@ export default function VocabularyPage() {
   // ─── Rebuild flashcard deck on filter change ───────────────────────────────
   useEffect(() => {
     if (!allWords.length) return;
-    const active = filteredWords.filter(w => !known.has(w.id));
-    setDeck(shuffle(active));
+    // Always shuffle from scratch so deck order is never derived from allWords order
+    const active = shuffle(filteredWords).filter(w => !known.has(w.id));
+    setDeck(active);
     setFlipped(false);
     setShowHint(false);
   }, [allWords, filterCat, filterDiff, search, known, activePack, favorites]); // eslint-disable-line react-hooks/exhaustive-deps
