@@ -300,7 +300,7 @@ export default function VocabularyPage() {
   useEffect(() => {
     if (!allWords.length) return;
     const active = filteredWords.filter(w => !known.has(w.id));
-    setDeck([...active]);
+    setDeck(shuffle(active));
     setFlipped(false);
     setShowHint(false);
   }, [allWords, filterCat, filterDiff, search, known, activePack, favorites]); // eslint-disable-line react-hooks/exhaustive-deps
