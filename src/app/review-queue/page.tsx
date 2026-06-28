@@ -18,6 +18,7 @@ export default function ReviewQueuePage() {
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
+  const [showQuestionPicker, setShowQuestionPicker] = useState(false);
 
   useEffect(() => {
     let id = localStorage.getItem('amiret_guest_id');
@@ -65,7 +66,6 @@ export default function ReviewQueuePage() {
     const wasCorrect = optionIndex === questions[currentIndex].correct_answer;
     if (wasCorrect) setCorrectCount(c => c + 1);
 
-    // Update review queue (fire-and-forget)
     fetch('/api/review-queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -86,6 +86,52 @@ export default function ReviewQueuePage() {
     }
   }, [currentIndex, questions.length]);
 
+  // Restart session (back to question 1, no DB change)
+  const handleRestartSession = () => {
+    setCurrentIndex(0);
+    setAnswers(Array(questions.length).fill(null));
+    setShowResult(false);
+    setCorrectCount(0);
+    setShowQuestionPicker(false);
+  };
+
+  // Delete a single question from the queue
+  const handleDeleteQuestion = async (questionId: string) => {
+    const idx = questions.findIndex(q => q.id === questionId);
+    const newQuestions = questions.filter(q => q.id !== questionId);
+    const newAnswers = answers.filter((_, i) => i !== idx);
+
+    if (newQuestions.length === 0) {
+      setStep('empty');
+    } else {
+      setQuestions(newQuestions);
+      setAnswers(newAnswers);
+      if (currentIndex >= newQuestions.length) {
+        setCurrentIndex(newQuestions.length - 1);
+      }
+      setShowResult(false);
+      setShowQuestionPicker(false);
+    }
+
+    fetch(`/api/review-queue?guestId=${encodeURIComponent(guestId)}&questionId=${encodeURIComponent(questionId)}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  };
+
+  // Clear ALL questions
+  const handleClearAll = async () => {
+    if (!window.confirm(`למחוק את כל ${questions.length} השאלות מרשימת החזרה?`)) return;
+    fetch(`/api/review-queue?guestId=${encodeURIComponent(guestId)}`, { method: 'DELETE' }).catch(() => {});
+    setStep('empty');
+  };
+
+  // Jump to a specific question
+  const handleJumpTo = (index: number) => {
+    setCurrentIndex(index);
+    setShowResult(answers[index] !== null);
+    setShowQuestionPicker(false);
+  };
+
   useEffect(() => {
     if (step !== 'reviewing') return;
     const onKey = (e: KeyboardEvent) => {
@@ -101,7 +147,7 @@ export default function ReviewQueuePage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, showResult, currentIndex, questions, handleNext]);
+  }, [step, showResult, currentIndex, questions, handleNext, handleSelect]);
 
   if (step === 'loading') {
     return (
@@ -172,10 +218,16 @@ export default function ReviewQueuePage() {
           </div>
           <div className="space-y-3">
             <button
-              onClick={() => fetchDueQuestions(guestId)}
+              onClick={handleRestartSession}
               className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
             >
-              חזרה נוספת
+              חזרה על אותן שאלות מחדש
+            </button>
+            <button
+              onClick={() => fetchDueQuestions(guestId)}
+              className="w-full py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-colors"
+            >
+              טען שאלות חדשות
             </button>
             <button
               onClick={() => router.push('/exam')}
@@ -189,12 +241,74 @@ export default function ReviewQueuePage() {
     );
   }
 
-  // Reviewing
+  // ─── Question picker panel ─────────────────────────────────────────────────
+  const QuestionPicker = () => (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowQuestionPicker(false)}>
+      <div className="bg-white rounded-t-3xl w-full max-w-lg max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <span className="font-bold text-slate-900 text-lg">בחר שאלה</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRestartSession}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-100 transition-colors"
+            >
+              <span>↺</span> ריסטרט
+            </button>
+            <button
+              onClick={handleClearAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-100 transition-colors"
+            >
+              🗑 נקה הכל
+            </button>
+            <button onClick={() => setShowQuestionPicker(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+          {questions.map((q, i) => {
+            const answered = answers[i] !== null;
+            const correct = answered && answers[i] === q.correct_answer;
+            const wrong = answered && answers[i] !== q.correct_answer;
+            return (
+              <div key={q.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${i === currentIndex ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
+                <button
+                  onClick={() => handleJumpTo(i)}
+                  className="flex-1 flex items-center gap-3 text-right"
+                >
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    i === currentIndex ? 'bg-orange-500 text-white' :
+                    correct ? 'bg-green-500 text-white' :
+                    wrong ? 'bg-red-400 text-white' :
+                    'bg-slate-200 text-slate-600'
+                  }`}>
+                    {correct ? '✓' : wrong ? '✗' : i + 1}
+                  </span>
+                  <span className="text-sm text-slate-700 text-right leading-snug line-clamp-2 flex-1">
+                    {q.text.length > 80 ? q.text.slice(0, 80) + '…' : q.text}
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleDeleteQuestion(q.id)}
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors text-base"
+                  title="הסר מהרשימה"
+                >
+                  🗑
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Reviewing ─────────────────────────────────────────────────────────────
   const question = questions[currentIndex];
   const isLast = currentIndex === questions.length - 1;
 
   return (
     <div className="min-h-screen bg-slate-50" dir="rtl">
+      {showQuestionPicker && <QuestionPicker />}
+
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
@@ -203,12 +317,16 @@ export default function ReviewQueuePage() {
               <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">חזרה</span>
             </div>
             <div className="text-xs text-slate-500">
-              יש לך {questions.length} שאלות לחזרה היום
+              {currentIndex + 1}/{questions.length} שאלות
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">{currentIndex + 1}/{questions.length}</span>
-            <div className="flex gap-1">
+            {/* Clickable dots — tap to open picker */}
+            <button
+              onClick={() => setShowQuestionPicker(true)}
+              className="flex gap-1 items-center p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              title="בחר שאלה"
+            >
               {questions.map((_, i) => (
                 <div
                   key={i}
@@ -219,7 +337,15 @@ export default function ReviewQueuePage() {
                   }`}
                 />
               ))}
-            </div>
+            </button>
+            {/* Restart session button */}
+            <button
+              onClick={handleRestartSession}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors text-lg"
+              title="ריסטרט — חזרה לשאלה ראשונה"
+            >
+              ↺
+            </button>
           </div>
         </div>
       </header>
@@ -235,16 +361,24 @@ export default function ReviewQueuePage() {
           showResult={showResult}
         />
 
-        {showResult && (
-          <div className="mt-6 flex justify-start">
+        <div className="mt-6 flex items-center justify-between gap-3">
+          {/* Delete current question */}
+          <button
+            onClick={() => handleDeleteQuestion(question.id)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-300 hover:bg-red-50 transition-colors text-sm font-medium"
+          >
+            🗑 הסר שאלה
+          </button>
+
+          {showResult && (
             <button
               onClick={handleNext}
               className="px-6 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-colors"
             >
               {isLast ? 'סיום חזרה ✓' : 'שאלה הבאה ‹'}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

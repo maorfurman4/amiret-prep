@@ -83,6 +83,32 @@ export async function GET(req: NextRequest) {
 }
 
 /**
+ * DELETE /api/review-queue?guestId=xxx              — clear all (restart)
+ * DELETE /api/review-queue?guestId=xxx&questionId=yyy — remove one question
+ */
+export async function DELETE(req: NextRequest) {
+  const { authClient, supabase } = await getServerClients();
+  const { data: { user } } = await authClient.auth.getUser();
+  const guestId = req.nextUrl.searchParams.get('guestId');
+  const questionId = req.nextUrl.searchParams.get('questionId');
+
+  if (!user && !guestId) {
+    return NextResponse.json({ error: 'auth required' }, { status: 401 });
+  }
+
+  const ownCol = user ? 'user_id' : 'guest_id';
+  const ownVal = user ? user.id : guestId!;
+
+  let q = supabase.from('review_queue').delete().eq(ownCol, ownVal);
+  if (questionId) q = q.eq('question_id', questionId);
+
+  const { error } = await q;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}
+
+/**
  * POST /api/review-queue
  * Body: { guestId, questionId, wasCorrect }
  * - Wrong answer: upsert into queue with interval_days=1

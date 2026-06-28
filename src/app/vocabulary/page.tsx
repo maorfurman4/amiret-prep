@@ -217,7 +217,7 @@ export default function VocabularyPage() {
     setKnown(loadSet(STORAGE_KEY));
     setFavorites(loadSet(FAV_KEY));
 
-    const VOCAB_CACHE_KEY = 'vocab_cache_v2';
+    const VOCAB_CACHE_KEY = 'vocab_cache_v3';
     const VOCAB_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
 
     const fetchAll = async () => {
@@ -227,7 +227,7 @@ export default function VocabularyPage() {
         if (raw) {
           const { data, ts } = JSON.parse(raw) as { data: VocabWord[]; ts: number };
           if (Date.now() - ts < VOCAB_CACHE_TTL && data.length > 0) {
-            setAllWords(data);
+            setAllWords(shuffle(data));
             setLoading(false);
             return;
           }
@@ -242,19 +242,20 @@ export default function VocabularyPage() {
         const { data } = await supabase
           .from('vocabulary')
           .select('*')
-          .order('word')
+          .order('id')
           .range(from, from + PAGE - 1);
         const rows = (data ?? []) as VocabWord[];
         all = [...all, ...rows];
         if (rows.length < PAGE) break;
         from += PAGE;
       }
-      setAllWords(all);
+      const shuffled = shuffle(all);
+      setAllWords(shuffled);
       setLoading(false);
 
-      // Persist to cache
+      // Persist to cache (pre-shuffled so every load is random)
       try {
-        localStorage.setItem(VOCAB_CACHE_KEY, JSON.stringify({ data: all, ts: Date.now() }));
+        localStorage.setItem(VOCAB_CACHE_KEY, JSON.stringify({ data: shuffled, ts: Date.now() }));
       } catch { /* storage full */ }
     };
     fetchAll();
